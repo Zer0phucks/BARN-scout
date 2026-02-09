@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#6750A4</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#EADDFF</color>
+    <color name="secondary">#625B71</color>
+    <color name="surface">#FFFBFE</color>
+    <color name="on_surface">#1C1B1F</color>
+    <color name="background">#FFFBFE</color>
+    <color name="error">#B3261E</color>
+    <color name="success">#2E7D32</color>
+    
+    <!-- Map marker colors -->
+    <color name="marker_unscouted">#FF5722</color>
+    <color name="marker_scouted">#4CAF50</color>
+    <color name="marker_follow_up">#FFC107</color>
+</resources>
