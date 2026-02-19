@@ -21,6 +21,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.vpt.scout.ui.screens.*
 import com.vpt.scout.ui.theme.ScoutAppTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     
@@ -63,6 +64,33 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScoutApp(container: AppContainer) {
+    val authState by container.authManager.state.collectAsState()
+    val loginScope = rememberCoroutineScope()
+    var loginError by remember { mutableStateOf<String?>(null) }
+    var loginLoading by remember { mutableStateOf(false) }
+    var lastEmail by remember { mutableStateOf(authState.email ?: "") }
+
+    if (!authState.isAuthenticated) {
+        LoginScreen(
+            initialEmail = lastEmail,
+            isLoading = loginLoading,
+            errorMessage = loginError,
+            onLogin = { email, password ->
+                lastEmail = email
+                loginScope.launch {
+                    loginLoading = true
+                    loginError = null
+                    val result = container.authManager.signIn(email, password)
+                    if (result.isFailure) {
+                        loginError = result.exceptionOrNull()?.message ?: "Login failed."
+                    }
+                    loginLoading = false
+                }
+            }
+        )
+        return
+    }
+
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route

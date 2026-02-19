@@ -17,13 +17,16 @@ class ScoutApplication : Application() {
  * Provides singleton instances of repositories and database.
  */
 class AppContainer(private val context: Application) {
+    val authManager: SupabaseAuthManager by lazy {
+        SupabaseAuthManager(context)
+    }
     
     val database: ScoutDatabase by lazy {
         ScoutDatabase.getDatabase(context)
     }
     
     val apiService: ScoutApiService by lazy {
-        ScoutApiService.create(context)
+        ScoutApiService.create(context) { authManager.getAccessToken() }
     }
     
     val propertyRepository: PropertyRepository by lazy {

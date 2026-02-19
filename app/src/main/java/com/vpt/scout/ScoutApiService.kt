@@ -295,7 +295,10 @@ interface ScoutApiService {
     // -------------------------------------------------------------------------
     
     companion object {
-        fun create(context: Context): ScoutApiService {
+        fun create(
+            context: Context,
+            accessTokenProvider: () -> String?
+        ): ScoutApiService {
             val baseUrl = context.getString(R.string.api_base_url)
             val apiKey = context.getString(R.string.api_key)
             
@@ -303,11 +306,18 @@ interface ScoutApiService {
                 level = HttpLoggingInterceptor.Level.BODY
             }
             
-            // Add API key to all requests
+            // Prefer Supabase bearer token. Fall back to API key if configured.
             val authInterceptor = okhttp3.Interceptor { chain ->
-                val request = chain.request().newBuilder()
-                    .addHeader("X-API-Key", apiKey)
-                    .build()
+                val token = accessTokenProvider().orEmpty()
+                val requestBuilder = chain.request().newBuilder()
+
+                if (token.isNotBlank()) {
+                    requestBuilder.addHeader("Authorization", "Bearer $token")
+                } else if (apiKey.isNotBlank()) {
+                    requestBuilder.addHeader("X-API-Key", apiKey)
+                }
+
+                val request = requestBuilder.build()
                 chain.proceed(request)
             }
             

@@ -7,6 +7,10 @@
     <!-- API key must match SCOUT_API_KEY on server (defaults to VPT_PASSWORD) -->
     <string name="api_key">P@ssw0rdz</string>
 
+    <!-- Supabase Auth (same project as BARN admin panel) -->
+    <string name="supabase_url">https://vzgmmlaojvkpbakvgcwh.supabase.co</string>
+    <string name="supabase_anon_key">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6Z21tbGFvanZrcGJha3ZnY3doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NTIzOTksImV4cCI6MjA4NjQyODM5OX0.djyx3tP2LLMFIE5vO7zgTR9U03OYivByVyAvtHsU5CA</string>
+
     
     <!-- UI Strings -->
     <string name="nav_home">Home</string>
