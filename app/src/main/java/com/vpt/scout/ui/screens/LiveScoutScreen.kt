@@ -267,7 +267,7 @@ fun LiveScoutScreen(
                     ) {
                         Text("Active filters:", fontWeight = FontWeight.Medium)
                         city?.let { Text(it) }
-                        if (vptOnly) Text("VPT")
+                        if (vptOnly) Text("Favorites")
                         listId?.let { Text("List #$it") }
                     }
                 }

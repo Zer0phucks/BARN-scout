@@ -4,7 +4,7 @@
             "outputFile": "com.vpt.scout.app-mergeDebugResources-64:/values-eu/values-eu.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\zer0p\\.gradle\\caches\\8.13\\transforms\\6be037af0a9f7bac67dd0efebb048744\\transformed\\play-services-basement-18.1.0\\res\\values-eu\\values.xml",
+                    "source": "/home/noob/.gradle/caches/8.13/transforms/6be037af0a9f7bac67dd0efebb048744/transformed/play-services-basement-18.1.0/res/values-eu/values.xml",
                     "from": {
                         "startLines": "4",
                         "startColumns": "0",
@@ -21,7 +21,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\zer0p\\.gradle\\caches\\8.13\\transforms\\698918e0e7095eee2663c802eb56e290\\transformed\\play-services-base-18.1.0\\res\\values-eu\\values.xml",
+                    "source": "/home/noob/.gradle/caches/8.13/transforms/698918e0e7095eee2663c802eb56e290/transformed/play-services-base-18.1.0/res/values-eu/values.xml",
                     "from": {
                         "startLines": "4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
                         "startColumns": "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
@@ -38,7 +38,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\zer0p\\.gradle\\caches\\8.13\\transforms\\365be36ae79a66c20d0524007e851c60\\transformed\\core-1.12.0\\res\\values-eu\\values-eu.xml",
+                    "source": "/home/noob/.gradle/caches/8.13/transforms/365be36ae79a66c20d0524007e851c60/transformed/core-1.12.0/res/values-eu/values-eu.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -55,7 +55,24 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\zer0p\\.gradle\\caches\\8.13\\transforms\\cc4f03a171f413d4e3744f68d8a86cad\\transformed\\material3-release\\res\\values-eu\\values-eu.xml",
+                    "source": "/home/noob/.gradle/caches/8.13/transforms/73e3c67d3caeb5c67a4f75c7f2cff2be/transformed/foundation-release/res/values-eu/values-eu.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,141",
+                        "endColumns": "85,88",
+                        "endOffsets": "136,225"
+                    },
+                    "to": {
+                        "startLines": "101,102",
+                        "startColumns": "4,4",
+                        "startOffsets": "11009,11095",
+                        "endColumns": "85,88",
+                        "endOffsets": "11090,11179"
+                    }
+                },
+                {
+                    "source": "/home/noob/.gradle/caches/8.13/transforms/cc4f03a171f413d4e3744f68d8a86cad/transformed/material3-release/res/values-eu/values-eu.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -72,7 +89,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\zer0p\\.gradle\\caches\\8.13\\transforms\\e7e023630b370b036e5a08d8755a42d4\\transformed\\ui-release\\res\\values-eu\\values-eu.xml",
+                    "source": "/home/noob/.gradle/caches/8.13/transforms/e7e023630b370b036e5a08d8755a42d4/transformed/ui-release/res/values-eu/values-eu.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -86,23 +103,6 @@
                         "startOffsets": "836,927,3283,3384,3488,3580,3656,10071,10160,10244,10319,10391,10479,10569,10744,10821,10889",
                         "endColumns": "90,80,100,103,91,75,86,88,83,74,71,87,89,73,76,67,119",
                         "endOffsets": "922,1003,3379,3483,3575,3651,3738,10155,10239,10314,10386,10474,10564,10638,10816,10884,11004"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\zer0p\\.gradle\\caches\\8.13\\transforms\\73e3c67d3caeb5c67a4f75c7f2cff2be\\transformed\\foundation-release\\res\\values-eu\\values-eu.xml",
-                    "from": {
-                        "startLines": "2,3",
-                        "startColumns": "4,4",
-                        "startOffsets": "55,141",
-                        "endColumns": "85,88",
-                        "endOffsets": "136,225"
-                    },
-                    "to": {
-                        "startLines": "101,102",
-                        "startColumns": "4,4",
-                        "startOffsets": "11009,11095",
-                        "endColumns": "85,88",
-                        "endOffsets": "11090,11179"
                     }
                 }
             ]

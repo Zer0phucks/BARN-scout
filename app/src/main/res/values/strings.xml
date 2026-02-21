@@ -3,7 +3,7 @@
     <string name="app_name">VPT Scout</string>
     
     <!-- API Configuration - Update with your Flask server URL -->
-    <string name="api_base_url">http://10.0.2.2:5000</string>
+    <string name="api_base_url">https://vzgmmlaojvkpbakvgcwh.supabase.co/functions/v1/vpt-scout-proxy</string>
     <!-- API key must match SCOUT_API_KEY on server (defaults to VPT_PASSWORD) -->
     <string name="api_key">P@ssw0rdz</string>
 

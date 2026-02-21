@@ -428,6 +428,8 @@ string scouting_title
 string selected
 string start_scouting
 string status_bar_notification_info_overflow
+string supabase_anon_key
+string supabase_url
 string switch_role
 string tab
 string template_percent

@@ -42,6 +42,8 @@ string save_continue_button
 string scouting_complete
 string scouting_title
 string start_scouting
+string supabase_anon_key
+string supabase_url
 string yes
 style Theme.ScoutApp
 xml backup_rules

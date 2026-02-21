@@ -109,14 +109,6 @@ fun PropertiesScreen(
             TopAppBar(
                 title = { Text("Properties") },
                 actions = {
-                    // Start Scout Mode button
-                    IconButton(
-                        onClick = { 
-                            onNavigateToScout(selectedCity, vptOnly, selectedListId)
-                        }
-                    ) {
-                        Icon(Icons.Default.DirectionsWalk, "Scout Mode")
-                    }
                     // Refresh button
                     IconButton(onClick = { loadProperties(currentPage) }) {
                         Icon(Icons.Default.Refresh, "Refresh")
@@ -157,6 +149,21 @@ fun PropertiesScreen(
                 onListChange = { selectedListId = it },
                 expanded = showFiltersExpanded,
                 onExpandToggle = { showFiltersExpanded = !showFiltersExpanded }
+            )
+
+            ScoutActionButtons(
+                selectedListId = selectedListId,
+                favoritesOnly = vptOnly,
+                onScout = {
+                    // Scout respects city + favorites filter, but does not lock to a list.
+                    onNavigateToScout(selectedCity, vptOnly, null)
+                },
+                onScoutByList = {
+                    selectedListId?.let { listId ->
+                        // Scout by list uses the selected list filter.
+                        onNavigateToScout(selectedCity, false, listId)
+                    }
+                }
             )
             
             // Results summary
@@ -291,6 +298,75 @@ fun PropertiesScreen(
                 showAddToListDialog = false
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScoutActionButtons(
+    selectedListId: Long?,
+    favoritesOnly: Boolean,
+    onScout: () -> Unit,
+    onScoutByList: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = onScout,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2E7D32),
+                    contentColor = Color.White
+                )
+            ) {
+                Icon(Icons.Default.DirectionsWalk, null)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Scout")
+            }
+
+            Button(
+                onClick = onScoutByList,
+                enabled = selectedListId != null,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1565C0),
+                    contentColor = Color.White,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Icon(Icons.Default.FormatListBulleted, null)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Scout by List")
+            }
+        }
+
+        val scoutModeHint = if (favoritesOnly) {
+            "Scout will use Favorites filter."
+        } else {
+            "Scout will use current filters."
+        }
+        Text(
+            text = scoutModeHint,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        if (selectedListId == null) {
+            Text(
+                text = "Select a list in filters to enable \"Scout by List\".",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -441,7 +517,7 @@ private fun FilterBar(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = vptOnly, onCheckedChange = onVptOnlyChange)
-                    Text("VPT Only", style = MaterialTheme.typography.bodySmall)
+                    Text("Favorites Only", style = MaterialTheme.typography.bodySmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = showUnscoutedOnly, onCheckedChange = onUnscoutedChange)
