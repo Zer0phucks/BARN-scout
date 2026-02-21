@@ -297,7 +297,8 @@ interface ScoutApiService {
     companion object {
         fun create(
             context: Context,
-            accessTokenProvider: () -> String?
+            accessTokenProvider: () -> String?,
+            authManager: SupabaseAuthManager? = null
         ): ScoutApiService {
             val baseUrl = context.getString(R.string.api_base_url)
             val apiKey = context.getString(R.string.api_key)
@@ -320,13 +321,49 @@ interface ScoutApiService {
                 val request = requestBuilder.build()
                 chain.proceed(request)
             }
+
+            // Authenticator to handle 401 responses by refreshing the token
+            val tokenAuthenticator = okhttp3.Authenticator { _, response ->
+                // Don't retry if we've already attempted to refresh
+                if (response.request.header("X-Retry-After-Refresh") != null) {
+                    return@Authenticator null
+                }
+
+                // Only handle 401 responses
+                if (response.code != 401) {
+                    return@Authenticator null
+                }
+
+                // Try to refresh the token
+                val refreshed = authManager?.refreshAccessTokenSync() ?: false
+                if (!refreshed) {
+                    return@Authenticator null
+                }
+
+                // Get the new token and retry the request
+                val newToken = accessTokenProvider()
+                if (newToken.isNullOrBlank()) {
+                    return@Authenticator null
+                }
+
+                response.request.newBuilder()
+                    .removeHeader("Authorization")
+                    .addHeader("Authorization", "Bearer $newToken")
+                    .addHeader("X-Retry-After-Refresh", "true")
+                    .build()
+            }
             
-            val client = OkHttpClient.Builder()
+            val clientBuilder = OkHttpClient.Builder()
                 .addInterceptor(authInterceptor)
                 .addInterceptor(logging)
                 .connectTimeout(60, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
-                .build()
+
+            if (authManager != null) {
+                clientBuilder.authenticator(tokenAuthenticator)
+            }
+
+            val client = clientBuilder.build()
             
             val gson = GsonBuilder()
                 .setLenient()

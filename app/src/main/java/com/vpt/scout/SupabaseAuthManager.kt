@@ -100,6 +100,129 @@ class SupabaseAuthManager(context: Context) {
             }
         }
 
+    /**
+     * Refresh the access token using the stored refresh token.
+     * Returns true if refresh was successful, false otherwise.
+     * On failure, clears the auth state so the user is prompted to log in again.
+     */
+    suspend fun refreshAccessToken(): Boolean = withContext(Dispatchers.IO) {
+        val currentRefreshToken = _state.value.refreshToken
+        if (currentRefreshToken.isNullOrBlank()) {
+            signOut()
+            return@withContext false
+        }
+
+        try {
+            val payload = JSONObject()
+                .put("refresh_token", currentRefreshToken)
+
+            val request = Request.Builder()
+                .url("$supabaseUrl/auth/v1/token?grant_type=refresh_token")
+                .addHeader("apikey", supabaseAnonKey)
+                .addHeader("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                val rawBody = response.body?.string().orEmpty()
+
+                if (!response.isSuccessful) {
+                    // Refresh token is invalid or expired, clear state
+                    signOut()
+                    return@withContext false
+                }
+
+                val json = JSONObject(rawBody)
+                val newAccessToken = json.optString("access_token").takeIf { it.isNotBlank() }
+                val newRefreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() }
+                    ?: currentRefreshToken
+                val user = json.optJSONObject("user")
+                val userId = user?.optString("id")?.takeIf { it.isNotBlank() } ?: _state.value.userId
+                val userEmail = user?.optString("email")?.takeIf { it.isNotBlank() } ?: _state.value.email
+
+                if (newAccessToken == null) {
+                    signOut()
+                    return@withContext false
+                }
+
+                val authState = SupabaseAuthState(
+                    accessToken = newAccessToken,
+                    refreshToken = newRefreshToken,
+                    userId = userId,
+                    email = userEmail
+                )
+
+                persistState(authState)
+                _state.value = authState
+                true
+            }
+        } catch (e: Exception) {
+            signOut()
+            false
+        }
+    }
+
+    /**
+     * Synchronous version of refreshAccessToken for use in OkHttp Authenticator.
+     * This blocks the calling thread.
+     */
+    @Synchronized
+    fun refreshAccessTokenSync(): Boolean {
+        val currentRefreshToken = _state.value.refreshToken
+        if (currentRefreshToken.isNullOrBlank()) {
+            signOut()
+            return false
+        }
+
+        return try {
+            val payload = JSONObject()
+                .put("refresh_token", currentRefreshToken)
+
+            val request = Request.Builder()
+                .url("$supabaseUrl/auth/v1/token?grant_type=refresh_token")
+                .addHeader("apikey", supabaseAnonKey)
+                .addHeader("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                val rawBody = response.body?.string().orEmpty()
+
+                if (!response.isSuccessful) {
+                    signOut()
+                    return false
+                }
+
+                val json = JSONObject(rawBody)
+                val newAccessToken = json.optString("access_token").takeIf { it.isNotBlank() }
+                val newRefreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() }
+                    ?: currentRefreshToken
+                val user = json.optJSONObject("user")
+                val userId = user?.optString("id")?.takeIf { it.isNotBlank() } ?: _state.value.userId
+                val userEmail = user?.optString("email")?.takeIf { it.isNotBlank() } ?: _state.value.email
+
+                if (newAccessToken == null) {
+                    signOut()
+                    return false
+                }
+
+                val authState = SupabaseAuthState(
+                    accessToken = newAccessToken,
+                    refreshToken = newRefreshToken,
+                    userId = userId,
+                    email = userEmail
+                )
+
+                persistState(authState)
+                _state.value = authState
+                true
+            }
+        } catch (e: Exception) {
+            signOut()
+            false
+        }
+    }
+
     private fun persistState(state: SupabaseAuthState) {
         prefs.edit()
             .putString(KEY_ACCESS_TOKEN, state.accessToken)

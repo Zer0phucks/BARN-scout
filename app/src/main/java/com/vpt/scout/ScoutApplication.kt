@@ -26,7 +26,7 @@ class AppContainer(private val context: Application) {
     }
     
     val apiService: ScoutApiService by lazy {
-        ScoutApiService.create(context) { authManager.getAccessToken() }
+        ScoutApiService.create(context, { authManager.getAccessToken() }, authManager)
     }
     
     val propertyRepository: PropertyRepository by lazy {
