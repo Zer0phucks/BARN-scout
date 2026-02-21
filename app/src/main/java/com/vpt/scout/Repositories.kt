@@ -103,6 +103,39 @@ class PropertyRepository(
      * Get VPT-only properties from cache.
      */
     val cachedVptProperties: Flow<List<PropertyEntity>> = propertyDao.getVptProperties()
+    
+    /**
+     * Load all APNs matching the given filters (for select all functionality).
+     * Fetches all pages and collects all APNs.
+     */
+    suspend fun loadAllPropertyApns(
+        city: String? = null,
+        query: String? = null,
+        vptOnly: Boolean = false,
+        scouted: Boolean? = null,
+        listId: Long? = null
+    ): Set<String> {
+        val allApns = mutableSetOf<String>()
+        var page = 1
+        var totalPages: Int
+        
+        do {
+            val response = loadProperties(
+                page = page,
+                perPage = 500, // Fetch in larger batches for efficiency
+                city = city,
+                query = query,
+                vptOnly = vptOnly,
+                scouted = scouted,
+                listId = listId
+            )
+            allApns.addAll(response.properties.map { it.apn })
+            totalPages = response.totalPages
+            page++
+        } while (page <= totalPages)
+        
+        return allApns
+    }
 }
 
 /**

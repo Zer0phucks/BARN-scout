@@ -186,13 +186,28 @@ fun PropertiesScreen(
                             onCheckedChange = { checked ->
                                 selectAll = checked
                                 if (checked) {
-                                    selectedApns = response.properties.map { it.apn }.toSet()
+                                    // Load all APNs matching current filters across all pages
+                                    scope.launch {
+                                        try {
+                                            val allApns = propertyRepository.loadAllPropertyApns(
+                                                city = selectedCity,
+                                                query = searchQuery.takeIf { it.isNotBlank() },
+                                                vptOnly = vptOnly,
+                                                scouted = if (showUnscoutedOnly) false else null,
+                                                listId = selectedListId
+                                            )
+                                            selectedApns = allApns
+                                        } catch (e: Exception) {
+                                            // Fall back to selecting current page only
+                                            selectedApns = response.properties.map { it.apn }.toSet()
+                                        }
+                                    }
                                 } else {
                                     selectedApns = emptySet()
                                 }
                             }
                         )
-                        Text("Select all", style = MaterialTheme.typography.bodySmall)
+                        Text("Select all (${response.total})", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

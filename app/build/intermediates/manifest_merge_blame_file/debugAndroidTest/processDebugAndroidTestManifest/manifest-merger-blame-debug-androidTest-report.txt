@@ -3,24 +3,24 @@
 3    package="com.vpt.scout.test" >
 4
 5    <uses-sdk
-5-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:5:5-74
+5-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:5:5-74
 6        android:minSdkVersion="26"
-6-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:5:15-41
+6-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:5:15-41
 7        android:targetSdkVersion="34" />
-7-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:5:42-71
+7-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:5:42-71
 8
 9    <instrumentation
-9-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:11:5-15:63
+9-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:11:5-15:63
 10        android:name="androidx.test.runner.AndroidJUnitRunner"
-10-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:11:22-76
+10-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:11:22-76
 11        android:functionalTest="false"
-11-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:14:22-52
+11-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:14:22-52
 12        android:handleProfiling="false"
-12-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:13:22-53
+12-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:13:22-53
 13        android:label="Tests for com.vpt.scout"
-13-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:15:22-61
+13-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:15:22-61
 14        android:targetPackage="com.vpt.scout" />
-14-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:12:22-59
+14-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:12:22-59
 15
 16    <uses-permission android:name="android.permission.REORDER_TASKS" />
 16-->[androidx.test:core:1.5.0] /home/noob/.gradle/caches/8.13/transforms/c5e2a6686ea2279d0ff50c9e29e3b6ba/transformed/core-1.5.0/AndroidManifest.xml:24:5-72
@@ -40,12 +40,12 @@
 22    </queries>
 23
 24    <application
-24-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:7:5-9:19
+24-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:7:5-9:19
 25        android:debuggable="true"
 26        android:extractNativeLibs="false" >
 27        <uses-library android:name="android.test.runner" />
-27-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:8:9-60
-27-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest3944825235054916104.xml:8:23-57
+27-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:8:9-60
+27-->/home/noob/BARN-scout/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest256766497968140478.xml:8:23-57
 28
 29        <activity
 29-->[androidx.test:core:1.5.0] /home/noob/.gradle/caches/8.13/transforms/c5e2a6686ea2279d0ff50c9e29e3b6ba/transformed/core-1.5.0/AndroidManifest.xml:27:9-34:20
