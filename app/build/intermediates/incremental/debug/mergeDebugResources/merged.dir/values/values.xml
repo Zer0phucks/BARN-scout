@@ -123,7 +123,7 @@
     <integer name="status_bar_notification_info_maxnum">999</integer>
     <string name="add_to_collection">Add to Collection</string>
     <string name="androidx_startup" translatable="false">androidx.startup</string>
-    <string name="api_base_url">https://nrfbgtmbginpcdxmttrq.supabase.co/functions/v1/vpt-scout-proxy</string>
+    <string name="api_base_url">https://app.bayrenewal.org</string>
     <string name="api_key">P@ssw0rdz</string>
     <string name="app_name">VPT Scout</string>
     <string name="call_notification_answer_action">Answer</string>
