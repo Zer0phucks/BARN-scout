@@ -10,10 +10,13 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class ProximityAlertPreferences(context: Context) {
+class ProximityAlertPreferences(
+    context: Context,
+    fileName: String = "proximity_alerts.preferences_pb"
+) {
 
     private val dataStore = PreferenceDataStoreFactory.create(
-        produceFile = { context.preferencesDataStoreFile("proximity_alerts.preferences_pb") }
+        produceFile = { context.preferencesDataStoreFile(fileName) }
     )
 
     val settings: Flow<ProximityAlertSettings> = dataStore.data.map { prefs ->
