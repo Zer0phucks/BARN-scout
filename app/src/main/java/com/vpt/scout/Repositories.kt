@@ -63,6 +63,14 @@ class PropertyRepository(
             listId = listId
         )
     }
+
+    suspend fun getPropertyByApn(apn: String): Property? {
+        return loadProperties(
+            page = 1,
+            perPage = 1,
+            query = apn
+        ).properties.firstOrNull { it.apn == apn }
+    }
     
     /**
      * Refresh map markers from API and cache locally.
