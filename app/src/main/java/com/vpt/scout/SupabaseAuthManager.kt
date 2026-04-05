@@ -32,6 +32,12 @@ class SupabaseAuthManager(context: Context) {
     private val _state = MutableStateFlow(loadState())
     val state: StateFlow<SupabaseAuthState> = _state.asStateFlow()
 
+    val projectUrl: String
+        get() = supabaseUrl
+
+    val anonKey: String
+        get() = supabaseAnonKey
+
     fun getAccessToken(): String? = _state.value.accessToken
 
     fun signOut() {

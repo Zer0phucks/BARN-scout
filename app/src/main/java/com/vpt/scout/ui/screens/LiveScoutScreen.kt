@@ -145,7 +145,11 @@ fun LiveScoutScreen(
         } catch (e: Exception) {
             e.printStackTrace()
             error = e.message ?: "Failed to find property"
-            scoutState = ScoutState.READY_TO_NAVIGATE
+            scoutState = if (currentProperty != null) {
+                ScoutState.READY_TO_NAVIGATE
+            } else {
+                ScoutState.FINDING_PROPERTY
+            }
         }
     }
     
@@ -249,6 +253,18 @@ fun LiveScoutScreen(
                         modifier = Modifier.padding(16.dp),
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
+                }
+                if (currentProperty == null && scoutState != ScoutState.SUBMITTING) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch { findNextProperty() }
+                        }
+                    ) {
+                        Icon(Icons.Default.Refresh, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Retry")
+                    }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -389,17 +405,13 @@ private fun PropertyCard(
             }
             
             // Distance
-            if (property is Property) {
-                (property as? Property)?.let { p ->
-                    p.latitude?.let { _ ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            "Distance: nearby",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            property.latitude?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Distance: nearby",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             
             Spacer(modifier = Modifier.height(16.dp))

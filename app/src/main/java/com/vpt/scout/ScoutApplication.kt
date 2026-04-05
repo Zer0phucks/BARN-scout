@@ -25,24 +25,29 @@ class AppContainer(private val context: Application) {
         ScoutDatabase.getDatabase(context)
     }
     
-    val apiService: ScoutApiService by lazy {
-        ScoutApiService.create(context, { authManager.getAccessToken() }, authManager)
+    val scannerService: ScannerDataService by lazy {
+        SupabaseScannerService(
+            baseUrl = authManager.projectUrl,
+            anonKey = authManager.anonKey,
+            accessTokenProvider = { authManager.getAccessToken() },
+            authManager = authManager
+        )
     }
     
     val propertyRepository: PropertyRepository by lazy {
-        PropertyRepository(database.propertyDao(), apiService)
+        PropertyRepository(database.propertyDao(), scannerService)
     }
     
     val listRepository: ListRepository by lazy {
-        ListRepository(apiService)
+        ListRepository(scannerService)
     }
     
     val scoutRepository: ScoutRepository by lazy {
-        ScoutRepository(database.scoutResultDao(), apiService)
+        ScoutRepository(scannerService)
     }
     
     // Legacy - for backward compatibility
     val collectionRepository: CollectionRepository by lazy {
-        CollectionRepository(database.collectionDao(), database.scoutResultDao(), apiService)
+        CollectionRepository(database.collectionDao(), database.scoutResultDao(), scannerService)
     }
 }

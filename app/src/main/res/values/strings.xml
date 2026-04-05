@@ -2,16 +2,10 @@
 <resources>
     <string name="app_name">VPT Scout</string>
     
-    <!-- API Configuration - Update with your Flask server URL -->
-    <string name="api_base_url">https://app.bayrenewal.org</string>
-    <!-- API key must match SCOUT_API_KEY on server (defaults to VPT_PASSWORD) -->
-    <string name="api_key">P@ssw0rdz</string>
-
     <!-- Supabase Auth (same project as BARN admin panel) -->
     <string name="supabase_url">https://nrfbgtmbginpcdxmttrq.supabase.co</string>
     <string name="supabase_anon_key">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yZmJndG1iZ2lucGNkeG10dHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTg0NzAsImV4cCI6MjA5MDAzNDQ3MH0.u8Jf2h9XIL3L4dsia5aN0fYaOaGWayNJ1dyw0VwNdN0</string>
 
-    
     <!-- UI Strings -->
     <string name="nav_home">Home</string>
     <string name="nav_collections">Collections</string>

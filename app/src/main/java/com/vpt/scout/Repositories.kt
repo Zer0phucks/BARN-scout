@@ -8,11 +8,11 @@ import kotlinx.coroutines.flow.flow
 import java.time.Instant
 
 /**
- * Repository for managing properties with Flask API as source of truth.
+ * Repository for managing properties with Supabase as source of truth.
  */
 class PropertyRepository(
     private val propertyDao: PropertyDao,
-    private val apiService: ScoutApiService
+    private val service: ScannerDataService
 ) {
     
     private val _propertiesState = MutableStateFlow<PropertiesState>(PropertiesState.Loading)
@@ -30,18 +30,16 @@ class PropertyRepository(
         scouted: Boolean? = null,
         listId: Long? = null
     ): PropertiesResponse {
-        val response = apiService.getProperties(
+        val response = service.getProperties(
+            filters = PropertyFilters(
+                city = city,
+                query = query,
+                vptOnly = vptOnly,
+                scouted = scouted,
+                listId = listId
+            ),
             page = page,
-            perPage = perPage,
-            city = city,
-            query = query,
-            vptOnly = if (vptOnly) "1" else null,
-            scouted = when (scouted) {
-                true -> "true"
-                false -> "false"
-                null -> null
-            },
-            listId = listId
+            perPage = perPage
         )
         _propertiesState.value = PropertiesState.Success(response)
         return response
@@ -57,11 +55,11 @@ class PropertyRepository(
         vptOnly: Boolean = false,
         listId: Long? = null
     ): NextPropertyResponse {
-        return apiService.getNextProperty(
+        return service.getNextProperty(
             latitude = latitude,
             longitude = longitude,
             city = city,
-            vptOnly = if (vptOnly) "1" else null,
+            vptOnly = vptOnly,
             listId = listId
         )
     }
@@ -71,23 +69,13 @@ class PropertyRepository(
      */
     suspend fun refreshMarkers() {
         try {
-            val response = apiService.getMarkers()
-            val entities = response.features.mapNotNull { feature ->
-                val coords = feature.geometry?.coordinates
-                if (coords != null && coords.size >= 2) {
-                    PropertyEntity(
-                        apn = feature.properties.apn,
-                        address = feature.properties.address ?: "Unknown",
-                        longitude = coords[0],
-                        latitude = coords[1],
-                        hasVpt = (feature.properties.hasVpt ?: 0) == 1,
-                        conditionScore = feature.properties.conditionScore,
-                        city = feature.properties.city,
-                        streetViewImagePath = feature.properties.streetviewImagePath,
-                        updatedAt = Instant.now()
-                    )
-                } else null
-            }
+            val entities = collectAllFilteredMapMarkerEntities(
+                filters = PropertyFilters(),
+                fetchPage = { filters, page, perPage ->
+                    service.getProperties(filters, page, perPage)
+                }
+            )
+            propertyDao.deleteAll()
             propertyDao.insertAll(entities)
         } catch (e: Exception) {
             e.printStackTrace()
@@ -138,6 +126,14 @@ class PropertyRepository(
     }
 }
 
+data class PropertyFilters(
+    val city: String? = null,
+    val query: String? = null,
+    val vptOnly: Boolean = false,
+    val scouted: Boolean? = null,
+    val listId: Long? = null
+)
+
 /**
  * State for properties loading.
  */
@@ -151,7 +147,7 @@ sealed class PropertiesState {
  * Repository for managing lists (collections) via Flask API.
  */
 class ListRepository(
-    private val apiService: ScoutApiService
+    private val service: ScannerDataService
 ) {
     
     private val _listsState = MutableStateFlow<ListsState>(ListsState.Loading)
@@ -161,7 +157,7 @@ class ListRepository(
      * Refresh lists from Flask API.
      */
     suspend fun refreshLists(): List<PropertyList> {
-        val lists = apiService.getLists()
+        val lists = service.getLists()
         _listsState.value = ListsState.Success(lists)
         return lists
     }
@@ -170,7 +166,7 @@ class ListRepository(
      * Create a new list.
      */
     suspend fun createList(name: String, description: String? = null): PropertyList {
-        val newList = apiService.createList(CreateListRequest(name, description))
+        val newList = service.createList(CreateListRequest(name, description))
         refreshLists()
         return newList
     }
@@ -179,7 +175,7 @@ class ListRepository(
      * Delete a list.
      */
     suspend fun deleteList(listId: Long) {
-        apiService.deleteList(listId)
+        service.deleteList(listId)
         refreshLists()
     }
     
@@ -187,28 +183,28 @@ class ListRepository(
      * Get list with properties.
      */
     suspend fun getList(listId: Long): ListWithProperties {
-        return apiService.getList(listId)
+        return service.getList(listId)
     }
     
     /**
      * Add properties to a list.
      */
     suspend fun addPropertiesToList(listId: Long, apns: List<String>) {
-        apiService.addPropertiesToList(listId, AddPropertiesRequest(apns))
+        service.addPropertiesToList(listId, AddPropertiesRequest(apns))
     }
     
     /**
      * Remove property from a list.
      */
     suspend fun removePropertyFromList(listId: Long, apn: String) {
-        apiService.removePropertyFromList(listId, apn)
+        service.removePropertyFromList(listId, apn)
     }
     
     /**
      * Get route URL for a list.
      */
     suspend fun getRouteUrl(listId: Long): RouteResponse {
-        return apiService.getListRoute(listId)
+        return service.getListRoute(listId)
     }
 }
 
@@ -225,8 +221,7 @@ sealed class ListsState {
  * Repository for scout mode operations.
  */
 class ScoutRepository(
-    private val scoutResultDao: ScoutResultDao,
-    private val apiService: ScoutApiService
+    private val service: ScannerDataService
 ) {
     
     /**
@@ -240,77 +235,38 @@ class ScoutRepository(
         latitude: Double?,
         longitude: Double?
     ): Long {
-        // Save locally
-        val entity = ScoutResultEntity(
-            apn = apn,
-            collectionId = null,
-            followUp = followUp,
-            flyered = flyered,
-            notes = notes,
-            scoutedAt = Instant.now(),
-            latitude = latitude,
-            longitude = longitude,
-            synced = false
-        )
-        val id = scoutResultDao.insert(entity)
-        
-        // Sync to server
-        try {
-            apiService.submitScoutResult(
-                ScoutResultRequest(
-                    apn = apn,
-                    followUp = followUp,
-                    flyered = flyered,
-                    notes = notes,
-                    latitude = latitude,
-                    longitude = longitude
-                )
+        service.submitScoutResult(
+            ScoutResultRequest(
+                apn = apn,
+                followUp = followUp,
+                flyered = flyered,
+                notes = notes,
+                latitude = latitude,
+                longitude = longitude
             )
-            scoutResultDao.markAsSynced(id)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // Will sync later
-        }
-        
-        return id
+        )
+        return Instant.now().toEpochMilli()
     }
     
     /**
      * Sync pending results to server.
      */
     suspend fun syncPendingResults() {
-        val unsynced = scoutResultDao.getUnsyncedResults()
-        for (result in unsynced) {
-            try {
-                apiService.submitScoutResult(
-                    ScoutResultRequest(
-                        apn = result.apn,
-                        followUp = result.followUp,
-                        flyered = result.flyered,
-                        notes = result.notes,
-                        latitude = result.latitude,
-                        longitude = result.longitude
-                    )
-                )
-                scoutResultDao.markAsSynced(result.id)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        return
     }
     
     /**
      * Get scout statistics from server.
      */
     suspend fun getStats(): ScoutStats {
-        return apiService.getScoutStats()
+        return service.getScoutStats()
     }
     
     /**
      * Get local scout results as Flow.
      */
     fun getLocalResults(): Flow<List<ScoutResultEntity>> {
-        return scoutResultDao.getAllResults()
+        return flow { emit(emptyList()) }
     }
 }
 
@@ -319,10 +275,10 @@ class ScoutRepository(
 class CollectionRepository(
     private val collectionDao: CollectionDao,
     private val scoutResultDao: ScoutResultDao,
-    private val apiService: ScoutApiService
+    private val service: ScannerDataService
 ) {
     // Delegate to ListRepository for API operations
-    private val listRepo = ListRepository(apiService)
+    private val listRepo = ListRepository(service)
     
     val allCollections: Flow<List<PropertyList>> = flow {
         emit(listRepo.refreshLists())
@@ -351,7 +307,7 @@ class CollectionRepository(
     }
     
     // Scout results - delegate to ScoutRepository
-    private val scoutRepo = ScoutRepository(scoutResultDao, apiService)
+    private val scoutRepo = ScoutRepository(service)
     
     suspend fun saveScoutResult(
         apn: String,
@@ -367,4 +323,41 @@ class CollectionRepository(
     suspend fun syncPendingResults() {
         scoutRepo.syncPendingResults()
     }
+}
+
+internal fun mapPropertiesResponseToEntities(response: PropertiesResponse): List<PropertyEntity> {
+    return response.properties.mapNotNull { property ->
+        val latitude = property.latitude ?: return@mapNotNull null
+        val longitude = property.longitude ?: return@mapNotNull null
+
+        PropertyEntity(
+            apn = property.apn,
+            address = property.address ?: "Unknown",
+            longitude = longitude,
+            latitude = latitude,
+            hasVpt = property.hasVpt,
+            conditionScore = property.conditionScore,
+            city = property.city,
+            streetViewImagePath = property.streetviewImagePath,
+            updatedAt = Instant.now()
+        )
+    }
+}
+
+internal suspend fun collectAllFilteredMapMarkerEntities(
+    filters: PropertyFilters,
+    fetchPage: suspend (filters: PropertyFilters, page: Int, perPage: Int) -> PropertiesResponse
+): List<PropertyEntity> {
+    val entities = mutableListOf<PropertyEntity>()
+    var page = 1
+    var totalPages: Int
+
+    do {
+        val response = fetchPage(filters, page, 200)
+        entities += mapPropertiesResponseToEntities(response)
+        totalPages = response.totalPages
+        page += 1
+    } while (page <= totalPages)
+
+    return entities
 }

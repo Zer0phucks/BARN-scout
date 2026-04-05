@@ -167,23 +167,7 @@ fun StatsScreen(
                                 color = Color(0xFF9C27B0)
                             )
                         }
-                        
                         Spacer(modifier = Modifier.weight(1f))
-                        
-                        // Sync button
-                        OutlinedButton(
-                            onClick = {
-                                scope.launch {
-                                    scoutRepository.syncPendingResults()
-                                    stats = scoutRepository.getStats()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Sync, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Sync Pending Results")
-                        }
                     }
                 }
             }
