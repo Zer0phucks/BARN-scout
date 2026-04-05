@@ -1,6 +1,10 @@
 package com.vpt.scout
 
 import android.app.Application
+import com.vpt.scout.proximity.ProximityAlertCoordinator
+import com.vpt.scout.proximity.ProximityAlertPreferences
+import com.vpt.scout.proximity.ProximityAlertRepository
+import com.vpt.scout.proximity.ProximityNotificationManager
 
 class ScoutApplication : Application() {
     
@@ -44,6 +48,22 @@ class AppContainer(private val context: Application) {
     
     val scoutRepository: ScoutRepository by lazy {
         ScoutRepository(scannerService)
+    }
+
+    val proximityAlertPreferences: ProximityAlertPreferences by lazy {
+        ProximityAlertPreferences(context)
+    }
+
+    val proximityAlertCoordinator: ProximityAlertCoordinator by lazy {
+        ProximityAlertCoordinator()
+    }
+
+    val proximityAlertRepository: ProximityAlertRepository by lazy {
+        ProximityAlertRepository(propertyRepository)
+    }
+
+    val proximityNotificationManager: ProximityNotificationManager by lazy {
+        ProximityNotificationManager(context)
     }
     
     // Legacy - for backward compatibility
