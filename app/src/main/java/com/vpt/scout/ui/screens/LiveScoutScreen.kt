@@ -59,11 +59,6 @@ fun LiveScoutScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var scoutedCount by remember { mutableStateOf(0) }
     
-    // Questionnaire
-    var followUp by remember { mutableStateOf(false) }
-    var flyered by remember { mutableStateOf(false) }
-    var notes by remember { mutableStateOf("") }
-    
     // Location permission
     val fusedLocationClient = remember {
         LocationServices.getFusedLocationProviderClient(context)
@@ -171,13 +166,14 @@ fun LiveScoutScreen(
     // Mark arrived (show questionnaire)
     fun onArrived() {
         scoutState = ScoutState.QUESTIONNAIRE
-        followUp = false
-        flyered = false
-        notes = ""
     }
     
     // Submit questionnaire
-    fun submitQuestionnaire() {
+    fun submitQuestionnaire(
+        followUp: Boolean,
+        flyered: Boolean,
+        notes: String
+    ) {
         scope.launch {
             scoutState = ScoutState.SUBMITTING
             try {
@@ -315,16 +311,16 @@ fun LiveScoutScreen(
                 }
                 
                 ScoutState.QUESTIONNAIRE -> {
-                    QuestionnaireCard(
-                        property = currentProperty,
-                        followUp = followUp,
-                        onFollowUpChange = { followUp = it },
-                        flyered = flyered,
-                        onFlyeredChange = { flyered = it },
-                        notes = notes,
-                        onNotesChange = { notes = it },
-                        onSubmit = { submitQuestionnaire() }
-                    )
+                    key(currentProperty?.apn) {
+                        ScoutResultForm(
+                            property = currentProperty,
+                            submitButtonText = "Submit & Find Next",
+                            enabled = scoutState != ScoutState.SUBMITTING,
+                            onSubmit = { followUp, flyered, notes ->
+                                submitQuestionnaire(followUp, flyered, notes)
+                            }
+                        )
+                    }
                 }
                 
                 ScoutState.SUBMITTING -> {
@@ -343,7 +339,7 @@ fun LiveScoutScreen(
 }
 
 @Composable
-private fun LoadingContent(message: String) {
+internal fun LoadingContent(message: String) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -468,16 +464,16 @@ private fun PropertyCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuestionnaireCard(
+internal fun ScoutResultForm(
     property: Property?,
-    followUp: Boolean,
-    onFollowUpChange: (Boolean) -> Unit,
-    flyered: Boolean,
-    onFlyeredChange: (Boolean) -> Unit,
-    notes: String,
-    onNotesChange: (String) -> Unit,
-    onSubmit: () -> Unit
+    submitButtonText: String,
+    enabled: Boolean,
+    onSubmit: (followUp: Boolean, flyered: Boolean, notes: String) -> Unit
 ) {
+    var followUp by remember { mutableStateOf(false) }
+    var flyered by remember { mutableStateOf(false) }
+    var notes by remember { mutableStateOf("") }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -517,7 +513,8 @@ private fun QuestionnaireCard(
                 )
                 Switch(
                     checked = followUp,
-                    onCheckedChange = onFollowUpChange
+                    onCheckedChange = { followUp = it },
+                    enabled = enabled
                 )
             }
             
@@ -535,7 +532,8 @@ private fun QuestionnaireCard(
                 )
                 Switch(
                     checked = flyered,
-                    onCheckedChange = onFlyeredChange
+                    onCheckedChange = { flyered = it },
+                    enabled = enabled
                 )
             }
             
@@ -544,21 +542,23 @@ private fun QuestionnaireCard(
             // Notes
             OutlinedTextField(
                 value = notes,
-                onValueChange = onNotesChange,
+                onValueChange = { notes = it },
                 label = { Text("Notes") },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 3
+                minLines = 3,
+                enabled = enabled
             )
             
             Spacer(modifier = Modifier.height(24.dp))
             
             Button(
-                onClick = onSubmit,
-                modifier = Modifier.fillMaxWidth()
+                onClick = { onSubmit(followUp, flyered, notes) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = enabled
             ) {
                 Icon(Icons.Default.Send, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Submit & Find Next")
+                Text(submitButtonText)
             }
         }
     }
