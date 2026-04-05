@@ -11,6 +11,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
@@ -368,47 +370,51 @@ class SupabaseScannerService(
     }
 
     override suspend fun getScoutResults(collectionId: Long?): List<ScoutResult> {
-        val url = buildString {
-            append("${baseUrl.trimEnd('/')}/rest/v1/scout_results?select=id,apn,collection_id,follow_up,flyered,notes,scouted_at,latitude,longitude&order=scouted_at.desc")
-            if (collectionId != null) {
-                append("&collection_id=eq.$collectionId")
+        return withContext(Dispatchers.IO) {
+            val url = buildString {
+                append("${baseUrl.trimEnd('/')}/rest/v1/scout_results?select=id,apn,collection_id,follow_up,flyered,notes,scouted_at,latitude,longitude&order=scouted_at.desc")
+                if (collectionId != null) {
+                    append("&collection_id=eq.$collectionId")
+                }
             }
-        }
-        val rows = executeJsonArrayRequest(
-            Request.Builder()
-                .url(url)
-                .applySupabaseHeaders()
-                .get()
-                .build()
-        )
-        return buildList {
-            for (index in 0 until rows.size()) {
-                val row = rows.get(index).asJsonObject
-                add(
-                    ScoutResult(
-                        id = row.get("id").asLong,
-                        apn = row.get("apn").asString,
-                        followUp = row.get("follow_up").asBoolean,
-                        flyered = row.get("flyered").asBoolean,
-                        notes = row.get("notes")?.takeUnless { it.isJsonNull }?.asString,
-                        scoutedAt = row.get("scouted_at")?.takeUnless { it.isJsonNull }?.asString,
-                        latitude = row.get("latitude")?.takeUnless { it.isJsonNull }?.asDouble,
-                        longitude = row.get("longitude")?.takeUnless { it.isJsonNull }?.asDouble
+            val rows = executeJsonArrayRequest(
+                Request.Builder()
+                    .url(url)
+                    .applySupabaseHeaders()
+                    .get()
+                    .build()
+            )
+            buildList {
+                for (index in 0 until rows.size()) {
+                    val row = rows.get(index).asJsonObject
+                    add(
+                        ScoutResult(
+                            id = row.get("id").asLong,
+                            apn = row.get("apn").asString,
+                            followUp = row.get("follow_up").asBoolean,
+                            flyered = row.get("flyered").asBoolean,
+                            notes = row.get("notes")?.takeUnless { it.isJsonNull }?.asString,
+                            scoutedAt = row.get("scouted_at")?.takeUnless { it.isJsonNull }?.asString,
+                            latitude = row.get("latitude")?.takeUnless { it.isJsonNull }?.asDouble,
+                            longitude = row.get("longitude")?.takeUnless { it.isJsonNull }?.asDouble
+                        )
                     )
-                )
+                }
             }
         }
     }
 
     override suspend fun getScoutStats(): ScoutStats {
-        val results = getScoutResults(collectionId = null)
-        val uniqueProperties = results.map { it.apn }.toSet().size
-        return ScoutStats(
-            totalVisits = results.size,
-            followUps = results.count { it.followUp },
-            flyered = results.count { it.flyered },
-            uniqueProperties = uniqueProperties
-        )
+        return withContext(Dispatchers.IO) {
+            val results = getScoutResults(collectionId = null)
+            val uniqueProperties = results.map { it.apn }.toSet().size
+            ScoutStats(
+                totalVisits = results.size,
+                followUps = results.count { it.followUp },
+                flyered = results.count { it.flyered },
+                uniqueProperties = uniqueProperties
+            )
+        }
     }
 
     private fun executePropertiesRpc(

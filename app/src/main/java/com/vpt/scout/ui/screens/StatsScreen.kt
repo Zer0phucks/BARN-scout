@@ -22,6 +22,30 @@ import com.vpt.scout.proximity.ProximityMonitorService
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
 
+internal enum class StatsContentState {
+    LOADING,
+    ERROR,
+    READY,
+    EMPTY
+}
+
+internal fun resolveStatsContentState(
+    isLoading: Boolean,
+    error: String?,
+    stats: ScoutStats?
+): StatsContentState {
+    return when {
+        isLoading -> StatsContentState.LOADING
+        error != null -> StatsContentState.ERROR
+        stats != null -> StatsContentState.READY
+        else -> StatsContentState.EMPTY
+    }
+}
+
+internal fun statsLoadErrorMessage(throwable: Throwable): String {
+    return throwable.message?.takeIf { it.isNotBlank() } ?: "Failed to load scout stats"
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(
@@ -89,7 +113,7 @@ fun StatsScreen(
         try {
             stats = scoutRepository.getStats()
         } catch (e: Exception) {
-            error = e.message
+            error = statsLoadErrorMessage(e)
         } finally {
             isLoading = false
         }
@@ -123,11 +147,11 @@ fun StatsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            when {
-                isLoading -> {
+            when (resolveStatsContentState(isLoading, error, stats)) {
+                StatsContentState.LOADING -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
-                error != null -> {
+                StatsContentState.ERROR -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -141,7 +165,7 @@ fun StatsScreen(
                                 try {
                                     stats = scoutRepository.getStats()
                                 } catch (e: Exception) {
-                                    error = e.message
+                                    error = statsLoadErrorMessage(e)
                                 } finally {
                                     isLoading = false
                                 }
@@ -151,7 +175,7 @@ fun StatsScreen(
                         }
                     }
                 }
-                stats != null -> {
+                StatsContentState.READY -> {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -246,6 +270,54 @@ fun StatsScreen(
                             }
                         )
                         Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+                StatsContentState.EMPTY -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    "Scout stats unavailable",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "The stats feed returned no data, but proximity alerts are still available below."
+                                )
+                            }
+                        }
+
+                        ProximityAlertsCard(
+                            settings = proximitySettings,
+                            status = when {
+                                proximitySettings.enabled && hasEssentialProximityPermissions() ->
+                                    "Monitoring is active. A foreground notification will stay visible."
+                                proximitySettings.enabled ->
+                                    "Monitoring wants permissions before it can stay active."
+                                else ->
+                                    "Off until you enable it."
+                            },
+                            error = proximityError,
+                            onEnabledChange = { updateMonitoring(it) },
+                            onThresholdSelected = { feet ->
+                                scope.launch {
+                                    proximityAlertPreferences.setThresholdFeet(feet)
+                                }
+                            }
+                        )
                     }
                 }
             }

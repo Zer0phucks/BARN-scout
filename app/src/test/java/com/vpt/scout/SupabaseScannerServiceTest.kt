@@ -1,10 +1,16 @@
 package com.vpt.scout
 
 import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -230,6 +236,36 @@ class SupabaseScannerServiceTest {
         assertTrue(list.properties.first().longitude != null)
         assertTrue(list.properties.first().isScouted)
         assertTrue(!list.properties.last().isScouted)
+    }
+
+    @Test
+    fun `getScoutStats does not perform HTTP work on caller thread`() = runBlocking {
+        val callerThread = Thread.currentThread().name
+        var requestThread: String? = null
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                requestThread = Thread.currentThread().name
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body("[]".toResponseBody("application/json".toMediaType()))
+                    .build()
+            }
+            .build()
+
+        val service = SupabaseScannerService(
+            baseUrl = server.url("/").toString(),
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null,
+            client = client
+        )
+
+        service.getScoutStats()
+
+        assertNotEquals(callerThread, requestThread)
     }
 
     private fun MockWebServer.enqueueJson(body: String) {
