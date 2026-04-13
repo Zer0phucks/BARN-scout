@@ -1,5 +1,7 @@
 package com.vpt.scout.ui.screens
 
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -8,29 +10,110 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vpt.scout.ScoutRepository
 import com.vpt.scout.ScoutStats
+import com.vpt.scout.proximity.ProximityAlertPreferences
+import com.vpt.scout.proximity.ProximityAlertSettings
+import com.vpt.scout.proximity.ProximityMonitorService
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
+
+internal enum class StatsContentState {
+    LOADING,
+    ERROR,
+    READY,
+    EMPTY
+}
+
+internal fun resolveStatsContentState(
+    isLoading: Boolean,
+    error: String?,
+    stats: ScoutStats?
+): StatsContentState {
+    return when {
+        isLoading -> StatsContentState.LOADING
+        error != null -> StatsContentState.ERROR
+        stats != null -> StatsContentState.READY
+        else -> StatsContentState.EMPTY
+    }
+}
+
+internal fun statsLoadErrorMessage(throwable: Throwable): String {
+    return throwable.message?.takeIf { it.isNotBlank() } ?: "Failed to load scout stats"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(
-    scoutRepository: ScoutRepository
+    scoutRepository: ScoutRepository,
+    proximityAlertPreferences: ProximityAlertPreferences,
+    requestProximityPermissions: ((Boolean) -> Unit) -> Unit
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var stats by remember { mutableStateOf<ScoutStats?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    val proximitySettings by proximityAlertPreferences.settings.collectAsState(
+        initial = ProximityAlertSettings()
+    )
+    var proximityError by remember { mutableStateOf<String?>(null) }
+
+    fun hasEssentialProximityPermissions(): Boolean {
+        val locationGranted = ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val notificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        return locationGranted && notificationsGranted
+    }
+
+    fun updateMonitoring(enabled: Boolean) {
+        if (enabled) {
+            requestProximityPermissions { granted ->
+                scope.launch {
+                    if (granted || hasEssentialProximityPermissions()) {
+                        proximityAlertPreferences.setEnabled(true)
+                        proximityError = null
+                        ContextCompat.startForegroundService(
+                            context,
+                            ProximityMonitorService.startIntent(context)
+                        )
+                    } else {
+                        proximityAlertPreferences.setEnabled(false)
+                        proximityError = "Location and notification permissions are required."
+                    }
+                }
+            }
+        } else {
+            scope.launch {
+                proximityAlertPreferences.setEnabled(false)
+                proximityError = null
+                context.stopService(ProximityMonitorService.stopIntent(context))
+            }
+        }
+    }
     
     // Load stats
     LaunchedEffect(Unit) {
         try {
             stats = scoutRepository.getStats()
         } catch (e: Exception) {
-            error = e.message
+            error = statsLoadErrorMessage(e)
         } finally {
             isLoading = false
         }
@@ -64,11 +147,11 @@ fun StatsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            when {
-                isLoading -> {
+            when (resolveStatsContentState(isLoading, error, stats)) {
+                StatsContentState.LOADING -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
-                error != null -> {
+                StatsContentState.ERROR -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -82,7 +165,7 @@ fun StatsScreen(
                                 try {
                                     stats = scoutRepository.getStats()
                                 } catch (e: Exception) {
-                                    error = e.message
+                                    error = statsLoadErrorMessage(e)
                                 } finally {
                                     isLoading = false
                                 }
@@ -92,7 +175,7 @@ fun StatsScreen(
                         }
                     }
                 }
-                stats != null -> {
+                StatsContentState.READY -> {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -167,9 +250,143 @@ fun StatsScreen(
                                 color = Color(0xFF9C27B0)
                             )
                         }
+
+                        ProximityAlertsCard(
+                            settings = proximitySettings,
+                            status = when {
+                                proximitySettings.enabled && hasEssentialProximityPermissions() ->
+                                    "Monitoring is active. A foreground notification will stay visible."
+                                proximitySettings.enabled ->
+                                    "Monitoring wants permissions before it can stay active."
+                                else ->
+                                    "Off until you enable it."
+                            },
+                            error = proximityError,
+                            onEnabledChange = { updateMonitoring(it) },
+                            onThresholdSelected = { feet ->
+                                scope.launch {
+                                    proximityAlertPreferences.setThresholdFeet(feet)
+                                }
+                            }
+                        )
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
+                StatsContentState.EMPTY -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    "Scout stats unavailable",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "The stats feed returned no data, but proximity alerts are still available below."
+                                )
+                            }
+                        }
+
+                        ProximityAlertsCard(
+                            settings = proximitySettings,
+                            status = when {
+                                proximitySettings.enabled && hasEssentialProximityPermissions() ->
+                                    "Monitoring is active. A foreground notification will stay visible."
+                                proximitySettings.enabled ->
+                                    "Monitoring wants permissions before it can stay active."
+                                else ->
+                                    "Off until you enable it."
+                            },
+                            error = proximityError,
+                            onEnabledChange = { updateMonitoring(it) },
+                            onThresholdSelected = { feet ->
+                                scope.launch {
+                                    proximityAlertPreferences.setThresholdFeet(feet)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProximityAlertsCard(
+    settings: ProximityAlertSettings,
+    status: String,
+    error: String?,
+    onEnabledChange: (Boolean) -> Unit,
+    onThresholdSelected: (Int) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Proximity Alerts",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        status,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = settings.enabled,
+                    onCheckedChange = onEnabledChange
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = settings.thresholdFeet == 500,
+                    onClick = { onThresholdSelected(500) },
+                    label = { Text("500 ft") }
+                )
+                FilterChip(
+                    selected = settings.thresholdFeet == 1000,
+                    onClick = { onThresholdSelected(1000) },
+                    label = { Text("1000 ft") }
+                )
+            }
+
+            error?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }

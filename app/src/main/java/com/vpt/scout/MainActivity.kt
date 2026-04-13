@@ -1,6 +1,8 @@
 package com.vpt.scout
 
 import android.Manifest
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,38 +21,70 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.vpt.scout.proximity.ProximityNotificationManager
 import com.vpt.scout.ui.screens.*
 import com.vpt.scout.ui.theme.ScoutAppTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    
-    private val locationPermissionRequest = registerForActivityResult(
+
+    private var pendingRoute by mutableStateOf<String?>(null)
+    private var onRuntimePermissionsResult: ((Boolean) -> Unit)? = null
+
+    private val runtimePermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val fineLocation = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
         val coarseLocation = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
-        // Handle permission result - the UI will update based on permission state
+        val notificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
+        } else {
+            true
+        }
+        val granted = (fineLocation || coarseLocation) && notificationsGranted
+        onRuntimePermissionsResult?.invoke(granted)
+        onRuntimePermissionsResult = null
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingRoute = extractRequestedRoute(intent)
         
-        // Request location permissions
-        locationPermissionRequest.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
+        requestProximityPermissions {}
         
         val container = (application as ScoutApplication).container
         
         setContent {
             ScoutAppTheme {
-                ScoutApp(container)
+                ScoutApp(
+                    container = container,
+                    pendingRoute = pendingRoute,
+                    onRouteConsumed = { pendingRoute = null },
+                    requestProximityPermissions = ::requestProximityPermissions
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingRoute = extractRequestedRoute(intent)
+    }
+
+    private fun requestProximityPermissions(onResult: (Boolean) -> Unit) {
+        onRuntimePermissionsResult = onResult
+        val permissions = buildList {
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }.toTypedArray()
+        runtimePermissionRequest.launch(permissions)
     }
 }
 
@@ -63,7 +97,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScoutApp(container: AppContainer) {
+fun ScoutApp(
+    container: AppContainer,
+    pendingRoute: String? = null,
+    onRouteConsumed: () -> Unit = {},
+    requestProximityPermissions: ((Boolean) -> Unit) -> Unit = {}
+) {
     val authState by container.authManager.state.collectAsState()
     val loginScope = rememberCoroutineScope()
     var loginError by remember { mutableStateOf<String?>(null) }
@@ -94,6 +133,15 @@ fun ScoutApp(container: AppContainer) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    LaunchedEffect(authState.isAuthenticated, pendingRoute) {
+        if (authState.isAuthenticated && !pendingRoute.isNullOrBlank()) {
+            navController.navigate(pendingRoute) {
+                launchSingleTop = true
+            }
+            onRouteConsumed()
+        }
+    }
     
     val bottomNavScreens = listOf(Screen.Properties, Screen.Lists, Screen.Map, Screen.Stats)
     // Show bottom bar for main tabs only (not for detail screens)
@@ -165,7 +213,9 @@ fun ScoutApp(container: AppContainer) {
             // Stats Screen
             composable(Screen.Stats.route) {
                 StatsScreen(
-                    scoutRepository = container.scoutRepository
+                    scoutRepository = container.scoutRepository,
+                    proximityAlertPreferences = container.proximityAlertPreferences,
+                    requestProximityPermissions = requestProximityPermissions
                 )
             }
             
@@ -207,9 +257,26 @@ fun ScoutApp(container: AppContainer) {
                     onBack = { navController.popBackStack() }
                 )
             }
+
+            composable(
+                route = "alerted-scout/{apn}",
+                arguments = listOf(navArgument("apn") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val apn = backStackEntry.arguments?.getString("apn") ?: return@composable
+                AlertedPropertyScoutScreen(
+                    apn = apn,
+                    proximityRepository = container.proximityAlertRepository,
+                    scoutRepository = container.scoutRepository,
+                    onBack = { navController.popBackStack() }
+                )
+            }
             
 // LIST ITEMS REMOVED
 
         }
     }
+}
+
+fun extractRequestedRoute(intent: Intent?): String? {
+    return intent?.getStringExtra(ProximityNotificationManager.EXTRA_ROUTE)
 }
