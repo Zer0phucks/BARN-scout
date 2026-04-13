@@ -1,0 +1,43 @@
+INFO: Constructing runner from config.
+INFO: Configuring Android Instrumentation driver: android_instrumentation_runtime {
+  instrumentation_info {
+    app_package: "com.vpt.scout"
+    test_package: "com.vpt.scout.test"
+    test_runner_class: "androidx.test.runner.AndroidJUnitRunner"
+  }
+  instrumentation_args {
+    args_map {
+      key: "additionalTestOutputDir"
+      value: "/sdcard/Android/media/com.vpt.scout/additional_test_output"
+    }
+  }
+}
+am_instrument_timeout: 31536000
+
+INFO: Configuring AndroidTestApkInstallerPlugin: apks_to_install {
+  apk_paths: "/home/noob/barn/android/app/build/outputs/apk/debug/app-debug.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+apks_to_install {
+  apk_paths: "/home/noob/barn/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+instrumentation_target_package_id: "com.vpt.scout"
+
+INFO: No installables found in test fixture. Nothing to install.
+INFO: Installing [/home/noob/barn/android/app/build/outputs/apk/debug/app-debug.apk] on device adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp.
+INFO: Installing [/home/noob/barn/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk] on device adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp.
+INFO: Start logcat streaming.
+INFO: Running Android Instrumentation driver.
+INFO: Copying files from device to host: /sdcard/Android/media/com.vpt.scout/additional_test_output to /home/noob/barn/android/app/build/outputs/connected_android_test_additional_output/debugAndroidTest/connected/CPH2583 - 16
+INFO: Stop logcat streaming.
+INFO: Uninstalling com.vpt.scout for device adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp.
+INFO: Uninstalling com.vpt.scout.test for device adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp.
+INFO: Execute com.vpt.scout.AppWorkflowTest.listDetailScreen_removesPropertyAndInvokesScout: PASSED
+INFO: Execute com.vpt.scout.AppWorkflowTest.listsScreen_createsNewListAndShowsIt: PASSED
+INFO: Execute com.vpt.scout.AppWorkflowTest.loginScreen_submitsTrimmedCredentials: PASSED
+INFO: Execute com.vpt.scout.AppWorkflowTest.listsScreen_deletesListAfterConfirmation: PASSED

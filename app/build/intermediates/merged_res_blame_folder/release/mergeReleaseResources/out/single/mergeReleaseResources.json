@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "com.vpt.scout.app-release-62:/xml_backup_rules.xml.flat",
+        "source": "com.vpt.scout.app-main-63:/xml/backup_rules.xml"
+    },
+    {
+        "merged": "com.vpt.scout.app-release-62:/xml_data_extraction_rules.xml.flat",
+        "source": "com.vpt.scout.app-main-63:/xml/data_extraction_rules.xml"
+    }
+]

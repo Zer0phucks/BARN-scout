@@ -1,0 +1,1 @@
+/tmp/target-device-spec.json 0

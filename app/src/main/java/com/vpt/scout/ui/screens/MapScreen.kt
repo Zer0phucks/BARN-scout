@@ -27,8 +27,10 @@ import com.vpt.scout.ListRepository
 import com.vpt.scout.PropertyList
 import com.vpt.scout.PropertyRepository
 import com.vpt.scout.data.local.PropertyEntity
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,7 +48,6 @@ fun MapScreen(
     var selectedProperty by remember { mutableStateOf<PropertyEntity?>(null) }
     var showListDialog by remember { mutableStateOf(false) }
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
-    var isLoadingLocation by remember { mutableStateOf(true) }
     
     // FusedLocationProviderClient for getting user location
     val fusedLocationClient = remember {
@@ -92,24 +93,21 @@ fun MapScreen(
     
     // Get user's current location
     LaunchedEffect(hasLocationPermission) {
-        if (hasLocationPermission) {
-            try {
-                val location = fusedLocationClient.lastLocation.await()
-                if (location != null) {
-                    val latLng = LatLng(location.latitude, location.longitude)
-                    userLocation = latLng
-                    // Animate camera to user location
-                    cameraPositionState.animate(
-                        CameraUpdateFactory.newLatLngZoom(latLng, 15f),
-                        durationMs = 1000
-                    )
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-        isLoadingLocation = false
-        propertyRepository.refreshMarkers()
+        initializeMapScreen(
+            hasLocationPermission = hasLocationPermission,
+            fetchLastLocation = { fusedLocationClient.lastLocation.await() },
+            onLocationAvailable = { latLng ->
+                userLocation = latLng
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngZoom(latLng, 15f),
+                    durationMs = 1000
+                )
+            },
+            refreshMarkers = {
+                propertyRepository.refreshMarkers()
+            },
+            onLoadingLocationChanged = {}
+        )
     }
     
     Scaffold(
@@ -351,24 +349,6 @@ fun MapScreen(
                     }
                 }
             }
-            
-            // Loading indicator
-            if (isLoadingLocation) {
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        Text("Getting your location...")
-                    }
-                }
-            }
         }
     }
     
@@ -387,6 +367,36 @@ fun MapScreen(
             }
         )
     }
+}
+
+internal suspend fun initializeMapScreen(
+    hasLocationPermission: Boolean,
+    fetchLastLocation: suspend () -> Location?,
+    onLocationAvailable: suspend (LatLng) -> Unit,
+    refreshMarkers: suspend () -> Unit,
+    onLoadingLocationChanged: (Boolean) -> Unit,
+    locationTimeoutMillis: Long = 3_000L
+) = coroutineScope {
+    val refreshJob = launch {
+        refreshMarkers()
+    }
+
+    try {
+        if (hasLocationPermission) {
+            val location = withTimeoutOrNull(locationTimeoutMillis) {
+                fetchLastLocation()
+            }
+            if (location != null) {
+                onLocationAvailable(LatLng(location.latitude, location.longitude))
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    } finally {
+        onLoadingLocationChanged(false)
+    }
+
+    refreshJob.join()
 }
 
 @Composable

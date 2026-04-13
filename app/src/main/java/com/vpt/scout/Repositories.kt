@@ -63,20 +63,32 @@ class PropertyRepository(
             listId = listId
         )
     }
+
+    suspend fun getPropertyByApn(apn: String): Property? {
+        return loadProperties(
+            page = 1,
+            perPage = 1,
+            query = apn
+        ).properties.firstOrNull { it.apn == apn }
+    }
     
     /**
      * Refresh map markers from API and cache locally.
      */
     suspend fun refreshMarkers() {
         try {
-            val entities = collectAllFilteredMapMarkerEntities(
+            propertyDao.deleteAll()
+            collectAllFilteredMapMarkerEntities(
                 filters = PropertyFilters(),
                 fetchPage = { filters, page, perPage ->
                     service.getProperties(filters, page, perPage)
+                },
+                perPage = 1000
+            ) { pageEntities ->
+                if (pageEntities.isNotEmpty()) {
+                    propertyDao.insertAll(pageEntities)
                 }
-            )
-            propertyDao.deleteAll()
-            propertyDao.insertAll(entities)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -346,15 +358,19 @@ internal fun mapPropertiesResponseToEntities(response: PropertiesResponse): List
 
 internal suspend fun collectAllFilteredMapMarkerEntities(
     filters: PropertyFilters,
-    fetchPage: suspend (filters: PropertyFilters, page: Int, perPage: Int) -> PropertiesResponse
+    fetchPage: suspend (filters: PropertyFilters, page: Int, perPage: Int) -> PropertiesResponse,
+    perPage: Int = 200,
+    onPageCollected: suspend (List<PropertyEntity>) -> Unit = {}
 ): List<PropertyEntity> {
     val entities = mutableListOf<PropertyEntity>()
     var page = 1
     var totalPages: Int
 
     do {
-        val response = fetchPage(filters, page, 200)
-        entities += mapPropertiesResponseToEntities(response)
+        val response = fetchPage(filters, page, perPage)
+        val pageEntities = mapPropertiesResponseToEntities(response)
+        entities += pageEntities
+        onPageCollected(pageEntities)
         totalPages = response.totalPages
         page += 1
     } while (page <= totalPages)

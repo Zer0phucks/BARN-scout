@@ -249,6 +249,7 @@ fun ListDetailScreen(
     listId: Long,
     listRepository: ListRepository,
     onNavigateToScout: () -> Unit,
+    onNavigateToCardSwipe: () -> Unit = {},
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -298,11 +299,23 @@ fun ListDetailScreen(
         },
         floatingActionButton = {
             if (list != null && list!!.properties.isNotEmpty()) {
-                ExtendedFloatingActionButton(
-                    onClick = onNavigateToScout,
-                    icon = { Icon(Icons.Default.DirectionsWalk, null) },
-                    text = { Text("Scout") }
-                )
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    ExtendedFloatingActionButton(
+                        onClick = onNavigateToCardSwipe,
+                        icon = { Icon(Icons.Default.Style, null) },
+                        text = { Text("Cards") },
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    ExtendedFloatingActionButton(
+                        onClick = onNavigateToScout,
+                        icon = { Icon(Icons.Default.DirectionsWalk, null) },
+                        text = { Text("Scout") }
+                    )
+                }
             }
         }
     ) { padding ->

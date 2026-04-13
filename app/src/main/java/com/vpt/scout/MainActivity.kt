@@ -34,14 +34,10 @@ class MainActivity : ComponentActivity() {
     private val runtimePermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val fineLocation = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-        val coarseLocation = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
-        val notificationsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
-        } else {
-            true
-        }
-        val granted = (fineLocation || coarseLocation) && notificationsGranted
+        val granted = areInitialProximityPermissionsGranted(
+            permissions = permissions,
+            sdkInt = Build.VERSION.SDK_INT
+        )
         onRuntimePermissionsResult?.invoke(granted)
         onRuntimePermissionsResult = null
     }
@@ -49,9 +45,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingRoute = extractRequestedRoute(intent)
-        
-        requestProximityPermissions {}
-        
+
         val container = (application as ScoutApplication).container
         
         setContent {
@@ -74,18 +68,33 @@ class MainActivity : ComponentActivity() {
 
     private fun requestProximityPermissions(onResult: (Boolean) -> Unit) {
         onRuntimePermissionsResult = onResult
-        val permissions = buildList {
-            add(Manifest.permission.ACCESS_FINE_LOCATION)
-            add(Manifest.permission.ACCESS_COARSE_LOCATION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }.toTypedArray()
+        val permissions = buildInitialProximityPermissionsRequest(Build.VERSION.SDK_INT)
         runtimePermissionRequest.launch(permissions)
     }
+}
+
+internal fun buildInitialProximityPermissionsRequest(sdkInt: Int): Array<String> {
+    return buildList {
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }.toTypedArray()
+}
+
+internal fun areInitialProximityPermissionsGranted(
+    permissions: Map<String, Boolean>,
+    sdkInt: Int
+): Boolean {
+    val fineLocation = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+    val coarseLocation = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+    val notificationsGranted = if (sdkInt >= Build.VERSION_CODES.TIRAMISU) {
+        permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
+    } else {
+        true
+    }
+    return (fineLocation || coarseLocation) && notificationsGranted
 }
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
@@ -179,6 +188,8 @@ fun ScoutApp(
                 PropertiesScreen(
                     propertyRepository = container.propertyRepository,
                     listRepository = container.listRepository,
+                    proximityAlertPreferences = container.proximityAlertPreferences,
+                    requestProximityPermissions = requestProximityPermissions,
                     onNavigateToScout = { city, vptOnly, listId ->
                         // Build route with optional args
                         val route = buildString {
@@ -213,9 +224,7 @@ fun ScoutApp(
             // Stats Screen
             composable(Screen.Stats.route) {
                 StatsScreen(
-                    scoutRepository = container.scoutRepository,
-                    proximityAlertPreferences = container.proximityAlertPreferences,
-                    requestProximityPermissions = requestProximityPermissions
+                    scoutRepository = container.scoutRepository
                 )
             }
             
@@ -254,6 +263,22 @@ fun ScoutApp(
                     onNavigateToScout = {
                         navController.navigate("scout?city=&vpt=0&listId=$listId")
                     },
+                    onNavigateToCardSwipe = {
+                        navController.navigate("cardSwipe/$listId")
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // Card Swipe Carousel Screen
+            composable(
+                route = "cardSwipe/{listId}",
+                arguments = listOf(navArgument("listId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val listId = backStackEntry.arguments?.getLong("listId") ?: return@composable
+                CardSwipeScreen(
+                    listId = listId,
+                    listRepository = container.listRepository,
                     onBack = { navController.popBackStack() }
                 )
             }

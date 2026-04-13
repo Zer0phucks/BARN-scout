@@ -1,0 +1,30 @@
+{
+  "version": 3,
+  "artifactType": {
+    "type": "EXTRACTED_APKS",
+    "kind": "Directory"
+  },
+  "applicationId": "com.vpt.scout",
+  "variantName": "debug",
+  "elements": [
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "outputFile": "../../../extracted_apks/debug/extractApksFromBundleForDebug/base-master_2.apk"
+    },
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "outputFile": "../../../extracted_apks/debug/extractApksFromBundleForDebug/base-xxxhdpi.apk"
+    },
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "outputFile": "../../../extracted_apks/debug/extractApksFromBundleForDebug/base-en.apk"
+    }
+  ],
+  "elementType": "File"
+}

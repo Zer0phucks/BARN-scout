@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.vpt.scout.app-mergeReleaseResources-60:/values-v16/values-v16.xml",
+            "map": [
+                {
+                    "source": "/home/noob/.gradle/caches/8.13/transforms/365be36ae79a66c20d0524007e851c60/transformed/core-1.12.0/res/values-v16/values-v16.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "65",
+                        "endOffsets": "116"
+                    }
+                }
+            ]
+        }
+    ]
+}

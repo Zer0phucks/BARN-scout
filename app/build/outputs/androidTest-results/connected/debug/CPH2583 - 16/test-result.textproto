@@ -1,0 +1,245 @@
+# proto-message: google.testing.platform.proto.api.core.TestSuiteResult
+# 2026-04-12T04:21:44.100865842Z:
+test_suite_meta_data {
+  scheduled_test_case_count: 4
+  device {
+    id: "adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp"
+    friendly_name: "primary"
+  }
+}
+test_status: PASSED
+test_result {
+  test_case {
+    test_class: "AppWorkflowTest"
+    test_package: "com.vpt.scout"
+    test_method: "listDetailScreen_removesPropertyAndInvokesScout"
+    start_time {
+      seconds: 1775967698
+      nanos: 74000000
+    }
+    end_time {
+      seconds: 1775967699
+      nanos: 244000000
+    }
+    device {
+      id: "adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/logcat-com.vpt.scout.AppWorkflowTest-listDetailScreen_removesPropertyAndInvokesScout.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "AppWorkflowTest"
+    test_package: "com.vpt.scout"
+    test_method: "listsScreen_createsNewListAndShowsIt"
+    start_time {
+      seconds: 1775967699
+      nanos: 251000000
+    }
+    end_time {
+      seconds: 1775967700
+      nanos: 656000000
+    }
+    device {
+      id: "adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/logcat-com.vpt.scout.AppWorkflowTest-listsScreen_createsNewListAndShowsIt.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "AppWorkflowTest"
+    test_package: "com.vpt.scout"
+    test_method: "loginScreen_submitsTrimmedCredentials"
+    start_time {
+      seconds: 1775967700
+      nanos: 657000000
+    }
+    end_time {
+      seconds: 1775967702
+      nanos: 11000000
+    }
+    device {
+      id: "adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/logcat-com.vpt.scout.AppWorkflowTest-loginScreen_submitsTrimmedCredentials.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/cpuinfo"
+    }
+  }
+}
+test_result {
+  test_case {
+    test_class: "AppWorkflowTest"
+    test_package: "com.vpt.scout"
+    test_method: "listsScreen_deletesListAfterConfirmation"
+    start_time {
+      seconds: 1775967702
+      nanos: 37000000
+    }
+    end_time {
+      seconds: 1775967702
+      nanos: 965000000
+    }
+    device {
+      id: "adb-a8cd9935-DJ3r3e._adb-tls-connect._tcp"
+      friendly_name: "primary"
+    }
+  }
+  test_status: PASSED
+  output_artifact {
+    label {
+      label: "logcat"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/logcat-com.vpt.scout.AppWorkflowTest-listsScreen_deletesListAfterConfirmation.txt"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/device-info.pb"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.meminfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/meminfo"
+    }
+  }
+  output_artifact {
+    label {
+      label: "device-info.cpuinfo"
+      namespace: "android"
+    }
+    source_path {
+      path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/cpuinfo"
+    }
+  }
+}
+output_artifact {
+  label {
+    label: "test-results.log"
+    namespace: "com.google.testing.platform.runtime.android.driver.AndroidInstrumentationDriver"
+  }
+  source_path {
+    path: "/home/noob/barn/android/app/build/outputs/androidTest-results/connected/debug/CPH2583 - 16/testlog/test-results.log"
+  }
+  type: TEST_DATA
+  mime_type: "text/plain"
+}

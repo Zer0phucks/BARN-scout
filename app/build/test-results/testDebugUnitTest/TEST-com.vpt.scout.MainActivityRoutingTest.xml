@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vpt.scout.MainActivityRoutingTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-04-12T20:12:21.262Z" hostname="noobsupreme" time="2.661">
+  <properties/>
+  <testcase name="launching main activity does not immediately start permission flow" classname="com.vpt.scout.MainActivityRoutingTest" time="2.605"/>
+  <testcase name="initial proximity permission result only requires foreground location and notifications" classname="com.vpt.scout.MainActivityRoutingTest" time="0.02"/>
+  <testcase name="extractRequestedRoute returns proximity route extra" classname="com.vpt.scout.MainActivityRoutingTest" time="0.016"/>
+  <testcase name="initial proximity permission request excludes background location" classname="com.vpt.scout.MainActivityRoutingTest" time="0.018"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

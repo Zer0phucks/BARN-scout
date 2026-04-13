@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vpt.scout.proximity.ProximityNotificationManagerTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-12T20:12:29.921Z" hostname="noobsupreme" time="0.036">
+  <properties/>
+  <testcase name="alert notification opens alerted scout route with apn" classname="com.vpt.scout.proximity.ProximityNotificationManagerTest" time="0.036"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

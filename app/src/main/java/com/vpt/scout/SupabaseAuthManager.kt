@@ -1,6 +1,9 @@
 package com.vpt.scout
 
 import android.content.Context
+import android.content.SharedPreferences
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,7 +13,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 
 data class SupabaseAuthState(
     val accessToken: String? = null,
@@ -22,12 +24,18 @@ data class SupabaseAuthState(
         get() = !accessToken.isNullOrBlank()
 }
 
-class SupabaseAuthManager(context: Context) {
-    private val appContext = context.applicationContext
-    private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val httpClient = OkHttpClient()
-    private val supabaseUrl = appContext.getString(R.string.supabase_url).trimEnd('/')
-    private val supabaseAnonKey = appContext.getString(R.string.supabase_anon_key)
+class SupabaseAuthManager(
+    private val prefs: SharedPreferences,
+    private val httpClient: OkHttpClient,
+    private val supabaseUrl: String,
+    private val supabaseAnonKey: String
+) {
+    constructor(context: Context) : this(
+        prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        httpClient = OkHttpClient(),
+        supabaseUrl = context.applicationContext.getString(R.string.supabase_url).trimEnd('/'),
+        supabaseAnonKey = context.applicationContext.getString(R.string.supabase_anon_key)
+    )
 
     private val _state = MutableStateFlow(loadState())
     val state: StateFlow<SupabaseAuthState> = _state.asStateFlow()
@@ -54,9 +62,10 @@ class SupabaseAuthManager(context: Context) {
                     )
                 }
 
-                val payload = JSONObject()
-                    .put("email", email.trim())
-                    .put("password", password)
+                val payload = JsonObject().apply {
+                    addProperty("email", email.trim())
+                    addProperty("password", password)
+                }
 
                 val request = Request.Builder()
                     .url("$supabaseUrl/auth/v1/token?grant_type=password")
@@ -69,26 +78,23 @@ class SupabaseAuthManager(context: Context) {
                     val rawBody = response.body?.string().orEmpty()
 
                     if (!response.isSuccessful) {
-                        val errorBody = runCatching { JSONObject(rawBody) }.getOrNull()
-                        val message = errorBody?.optString("msg")
-                            ?.takeIf { it.isNotBlank() }
-                            ?: errorBody?.optString("error_description")
-                                ?.takeIf { it.isNotBlank() }
-                            ?: errorBody?.optString("error")
-                                ?.takeIf { it.isNotBlank() }
+                        val errorBody = runCatching { JsonParser().parse(rawBody).asJsonObject }.getOrNull()
+                        val message = errorBody?.string("msg")
+                            ?: errorBody?.string("error_description")
+                            ?: errorBody?.string("error")
                             ?: "Login failed (${response.code})"
                         return@withContext Result.failure(IllegalStateException(message))
                     }
 
-                    val json = JSONObject(rawBody)
-                    val accessToken = json.optString("access_token").takeIf { it.isNotBlank() }
+                    val json = JsonParser().parse(rawBody).asJsonObject
+                    val accessToken = json.string("access_token")
                         ?: return@withContext Result.failure(
                             IllegalStateException("Supabase login did not return an access token.")
                         )
-                    val refreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() }
-                    val user = json.optJSONObject("user")
-                    val userId = user?.optString("id")?.takeIf { it.isNotBlank() }
-                    val userEmail = user?.optString("email")?.takeIf { it.isNotBlank() } ?: email.trim()
+                    val refreshToken = json.string("refresh_token")
+                    val user = json.objectValue("user")
+                    val userId = user?.string("id")
+                    val userEmail = user?.string("email") ?: email.trim()
 
                     val authState = SupabaseAuthState(
                         accessToken = accessToken,
@@ -119,8 +125,9 @@ class SupabaseAuthManager(context: Context) {
         }
 
         try {
-            val payload = JSONObject()
-                .put("refresh_token", currentRefreshToken)
+            val payload = JsonObject().apply {
+                addProperty("refresh_token", currentRefreshToken)
+            }
 
             val request = Request.Builder()
                 .url("$supabaseUrl/auth/v1/token?grant_type=refresh_token")
@@ -138,13 +145,13 @@ class SupabaseAuthManager(context: Context) {
                     return@withContext false
                 }
 
-                val json = JSONObject(rawBody)
-                val newAccessToken = json.optString("access_token").takeIf { it.isNotBlank() }
-                val newRefreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() }
+                val json = JsonParser().parse(rawBody).asJsonObject
+                val newAccessToken = json.string("access_token")
+                val newRefreshToken = json.string("refresh_token")
                     ?: currentRefreshToken
-                val user = json.optJSONObject("user")
-                val userId = user?.optString("id")?.takeIf { it.isNotBlank() } ?: _state.value.userId
-                val userEmail = user?.optString("email")?.takeIf { it.isNotBlank() } ?: _state.value.email
+                val user = json.objectValue("user")
+                val userId = user?.string("id") ?: _state.value.userId
+                val userEmail = user?.string("email") ?: _state.value.email
 
                 if (newAccessToken == null) {
                     signOut()
@@ -181,8 +188,9 @@ class SupabaseAuthManager(context: Context) {
         }
 
         return try {
-            val payload = JSONObject()
-                .put("refresh_token", currentRefreshToken)
+            val payload = JsonObject().apply {
+                addProperty("refresh_token", currentRefreshToken)
+            }
 
             val request = Request.Builder()
                 .url("$supabaseUrl/auth/v1/token?grant_type=refresh_token")
@@ -199,13 +207,13 @@ class SupabaseAuthManager(context: Context) {
                     return false
                 }
 
-                val json = JSONObject(rawBody)
-                val newAccessToken = json.optString("access_token").takeIf { it.isNotBlank() }
-                val newRefreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() }
+                val json = JsonParser().parse(rawBody).asJsonObject
+                val newAccessToken = json.string("access_token")
+                val newRefreshToken = json.string("refresh_token")
                     ?: currentRefreshToken
-                val user = json.optJSONObject("user")
-                val userId = user?.optString("id")?.takeIf { it.isNotBlank() } ?: _state.value.userId
-                val userEmail = user?.optString("email")?.takeIf { it.isNotBlank() } ?: _state.value.email
+                val user = json.objectValue("user")
+                val userId = user?.string("id") ?: _state.value.userId
+                val userEmail = user?.string("email") ?: _state.value.email
 
                 if (newAccessToken == null) {
                     signOut()
@@ -256,3 +264,9 @@ class SupabaseAuthManager(context: Context) {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
+
+private fun JsonObject.string(key: String): String? =
+    get(key)?.takeUnless { it.isJsonNull }?.asString?.takeIf { it.isNotBlank() }
+
+private fun JsonObject.objectValue(key: String): JsonObject? =
+    get(key)?.takeUnless { it.isJsonNull }?.asJsonObject

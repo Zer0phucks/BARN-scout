@@ -14,7 +14,12 @@ data class Property(
     @SerializedName("has_vpt") val hasVpt: Boolean = false,
     @SerializedName("condition_score") val conditionScore: Float?,
     @SerializedName("is_scouted") val isScouted: Boolean = false,
-    @SerializedName("streetview_image_path") val streetviewImagePath: String?
+    @SerializedName("streetview_image_path") val streetviewImagePath: String?,
+    @SerializedName("power_status") val powerStatus: String? = null,
+    @SerializedName("mailing_address") val mailingAddress: String? = null,
+    @SerializedName("last_sale_date") val lastSaleDate: String? = null,
+    @SerializedName("is_out_of_state") val isOutOfState: Boolean = false,
+    @SerializedName("deceased_count") val deceasedCount: Int? = null
 )
 
 data class PropertiesResponse(

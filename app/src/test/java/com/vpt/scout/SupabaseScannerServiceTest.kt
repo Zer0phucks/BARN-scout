@@ -1,13 +1,22 @@
 package com.vpt.scout
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.asCoroutineDispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.util.Collections
+import java.util.concurrent.Executors
 
 class SupabaseScannerServiceTest {
 
@@ -139,6 +148,88 @@ class SupabaseScannerServiceTest {
     }
 
     @Test
+    fun `getProperties tolerates explicit json nulls in property rows`() = runBlocking {
+        server.enqueueJson(
+            """
+            {
+              "rows": [
+                {
+                  "apn": "001-100-100",
+                  "location_of_property": null,
+                  "address": "123 Test St",
+                  "city": null,
+                  "has_vpt": 1,
+                  "condition_score": null,
+                  "streetview_image_path": null,
+                  "row_json": null
+                }
+              ],
+              "total": 1
+            }
+            """.trimIndent()
+        )
+        server.enqueueJson("""[]""")
+
+        val service = SupabaseScannerService(
+            baseUrl = server.url("/").toString(),
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null
+        )
+
+        val response = service.getProperties(
+            filters = PropertyFilters(city = "OAKLAND"),
+            page = 1,
+            perPage = 50
+        )
+
+        assertEquals(1, response.total)
+        assertEquals("001-100-100", response.properties.single().apn)
+        assertEquals("123 Test St", response.properties.single().address)
+        assertEquals(null, response.properties.single().city)
+    }
+
+    @Test
+    fun `getProperties parses wrapped postgrest rpc payload`() = runBlocking {
+        server.enqueueJson(
+            """
+            [
+              {
+                "get_bills_filtered": {
+                  "rows": [
+                    {
+                      "apn": "001-100-100",
+                      "location_of_property": "123 Test St",
+                      "city": "OAKLAND",
+                      "has_vpt": 1
+                    }
+                  ],
+                  "total": 1
+                }
+              }
+            ]
+            """.trimIndent()
+        )
+        server.enqueueJson("""[]""")
+
+        val service = SupabaseScannerService(
+            baseUrl = server.url("/").toString(),
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null
+        )
+
+        val response = service.getProperties(
+            filters = PropertyFilters(city = "OAKLAND"),
+            page = 1,
+            perPage = 50
+        )
+
+        assertEquals(1, response.total)
+        assertEquals("001-100-100", response.properties.single().apn)
+    }
+
+    @Test
     fun `getProperties sends -1 for p_vpt when not filtering to vpt only`() = runBlocking {
         server.enqueueJson("""{"rows":[],"total":0}""")
         server.enqueueJson("""[]""")
@@ -158,6 +249,30 @@ class SupabaseScannerServiceTest {
 
         val request = server.takeRequest()
         assertTrue(request.body.readUtf8().contains("\"p_vpt\":-1"))
+    }
+
+    @Test
+    fun `getProperties sends no-filter sentinel values for optional integer filters`() = runBlocking {
+        server.enqueueJson("""{"rows":[],"total":0}""")
+        server.enqueueJson("""[]""")
+
+        val service = SupabaseScannerService(
+            baseUrl = server.url("/").toString(),
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null
+        )
+
+        service.getProperties(
+            filters = PropertyFilters(city = "OAKLAND", vptOnly = false),
+            page = 1,
+            perPage = 50
+        )
+
+        val requestBody = server.takeRequest().body.readUtf8()
+        assertTrue(requestBody.contains("\"p_fav\":-1"))
+        assertTrue(requestBody.contains("\"p_delinquent\":-1"))
+        assertTrue(requestBody.contains("\"p_outofstate\":-1"))
     }
 
     @Test
@@ -230,6 +345,50 @@ class SupabaseScannerServiceTest {
         assertTrue(list.properties.first().longitude != null)
         assertTrue(list.properties.first().isScouted)
         assertTrue(!list.properties.last().isScouted)
+    }
+
+    @Test
+    fun `getProperties executes blocking http work off the caller thread`() = runBlocking {
+        val requestThreads = Collections.synchronizedList(mutableListOf<String>())
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                requestThreads += Thread.currentThread().name
+                val body = when (chain.request().url.encodedPath) {
+                    "/rest/v1/rpc/get_bills_filtered" -> """{"rows":[],"total":0}"""
+                    else -> "[]"
+                }
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body(body.toResponseBody("application/json".toMediaType()))
+                    .build()
+            }
+            .build()
+
+        val service = SupabaseScannerService(
+            baseUrl = "https://example.supabase.co",
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null,
+            client = client
+        )
+
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "caller-thread")
+        }.asCoroutineDispatcher().use { dispatcher ->
+            withContext(dispatcher) {
+                service.getProperties(
+                    filters = PropertyFilters(city = "OAKLAND"),
+                    page = 1,
+                    perPage = 50
+                )
+            }
+        }
+
+        assertTrue(requestThreads.isNotEmpty())
+        assertTrue(requestThreads.none { it.contains("caller-thread") })
     }
 
     private fun MockWebServer.enqueueJson(body: String) {

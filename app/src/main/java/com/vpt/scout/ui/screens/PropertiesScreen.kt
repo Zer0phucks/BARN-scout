@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vpt.scout.*
+import com.vpt.scout.proximity.ProximityAlertPreferences
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,6 +30,8 @@ import kotlinx.coroutines.launch
 fun PropertiesScreen(
     propertyRepository: PropertyRepository,
     listRepository: ListRepository,
+    proximityAlertPreferences: ProximityAlertPreferences,
+    requestProximityPermissions: ((Boolean) -> Unit) -> Unit,
     onNavigateToScout: (city: String?, vptOnly: Boolean, listId: Long?) -> Unit
 ) {
     val context = LocalContext.current
@@ -133,6 +136,12 @@ fun PropertiesScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            ProximityAlertsSection(
+                proximityAlertPreferences = proximityAlertPreferences,
+                requestProximityPermissions = requestProximityPermissions,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
             // Filter bar
             FilterBar(
                 searchQuery = searchQuery,

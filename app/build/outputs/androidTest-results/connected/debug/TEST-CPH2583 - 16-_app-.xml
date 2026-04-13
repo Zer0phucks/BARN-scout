@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.vpt.scout.AppWorkflowTest" tests="4" failures="0" errors="0" skipped="0" time="6.001" timestamp="2026-04-12T04:21:44" hostname="localhost">
+  <properties>
+    <property name="device" value="CPH2583 - 16" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="listDetailScreen_removesPropertyAndInvokesScout" classname="com.vpt.scout.AppWorkflowTest" time="1.162" />
+  <testcase name="listsScreen_createsNewListAndShowsIt" classname="com.vpt.scout.AppWorkflowTest" time="1.406" />
+  <testcase name="loginScreen_submitsTrimmedCredentials" classname="com.vpt.scout.AppWorkflowTest" time="1.355" />
+  <testcase name="listsScreen_deletesListAfterConfirmation" classname="com.vpt.scout.AppWorkflowTest" time="0.929" />
+</testsuite>
