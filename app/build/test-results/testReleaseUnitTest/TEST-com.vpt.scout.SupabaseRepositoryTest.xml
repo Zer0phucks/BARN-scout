@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vpt.scout.SupabaseRepositoryTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-12T01:47:39.614Z" hostname="noobsupreme" time="0.013">
+  <properties/>
+  <testcase name="submitScoutResult fails when supabase write fails" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

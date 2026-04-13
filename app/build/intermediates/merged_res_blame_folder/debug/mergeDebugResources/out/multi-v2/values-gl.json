@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.vpt.scout.app-mergeDebugResources-64:/values-gl/values-gl.xml",
+            "outputFile": "com.vpt.scout.app-mergeDebugResources-2:/values-gl/values-gl.xml",
             "map": [
                 {
                     "source": "/home/noob/.gradle/caches/8.13/transforms/e7e023630b370b036e5a08d8755a42d4/transformed/ui-release/res/values-gl/values-gl.xml",

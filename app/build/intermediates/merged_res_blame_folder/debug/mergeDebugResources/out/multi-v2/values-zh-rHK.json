@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.vpt.scout.app-mergeDebugResources-64:/values-zh-rHK/values-zh-rHK.xml",
+            "outputFile": "com.vpt.scout.app-mergeDebugResources-2:/values-zh-rHK/values-zh-rHK.xml",
             "map": [
                 {
                     "source": "/home/noob/.gradle/caches/8.13/transforms/698918e0e7095eee2663c802eb56e290/transformed/play-services-base-18.1.0/res/values-zh-rHK/values.xml",

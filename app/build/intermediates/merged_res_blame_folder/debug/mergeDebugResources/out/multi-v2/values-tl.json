@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.vpt.scout.app-mergeDebugResources-64:/values-tl/values-tl.xml",
+            "outputFile": "com.vpt.scout.app-mergeDebugResources-2:/values-tl/values-tl.xml",
             "map": [
                 {
                     "source": "/home/noob/.gradle/caches/8.13/transforms/cc4f03a171f413d4e3744f68d8a86cad/transformed/material3-release/res/values-tl/values-tl.xml",

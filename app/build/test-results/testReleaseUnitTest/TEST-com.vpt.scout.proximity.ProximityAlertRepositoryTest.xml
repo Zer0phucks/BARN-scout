@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vpt.scout.proximity.ProximityAlertRepositoryTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-04-12T01:47:40.116Z" hostname="noobsupreme" time="0.005">
+  <properties/>
+  <testcase name="returns null when nearest property is already scouted" classname="com.vpt.scout.proximity.ProximityAlertRepositoryTest" time="0.002"/>
+  <testcase name="getNearestUnscoutedProperty uses next-property rpc with global filters" classname="com.vpt.scout.proximity.ProximityAlertRepositoryTest" time="0.002"/>
+  <testcase name="getPropertyForAlert returns exact alerted property by apn" classname="com.vpt.scout.proximity.ProximityAlertRepositoryTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

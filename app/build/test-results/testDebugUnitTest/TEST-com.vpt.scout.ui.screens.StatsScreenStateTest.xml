@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vpt.scout.ui.screens.StatsScreenStateTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-04-12T01:47:24.879Z" hostname="noobsupreme" time="0.0">
+  <properties/>
+  <testcase name="resolveStatsContentState returns ready when stats are present" classname="com.vpt.scout.ui.screens.StatsScreenStateTest" time="0.0"/>
+  <testcase name="resolveStatsContentState returns empty when stats are missing without an error" classname="com.vpt.scout.ui.screens.StatsScreenStateTest" time="0.0"/>
+  <testcase name="statsLoadErrorMessage falls back when exception message is null" classname="com.vpt.scout.ui.screens.StatsScreenStateTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

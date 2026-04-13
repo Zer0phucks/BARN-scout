@@ -1,18 +1,20 @@
-#Thu Mar 26 16:21:47 PDT 2026
-base.0=/home/noob/BARN-scout/app/build/intermediates/dex/debug/mergeExtDexDebug/classes.dex
-base.1=/home/noob/BARN-scout/app/build/intermediates/dex/debug/mergeProjectDexDebug/0/classes.dex
-base.2=/home/noob/BARN-scout/app/build/intermediates/dex/debug/mergeProjectDexDebug/11/classes.dex
-base.3=/home/noob/BARN-scout/app/build/intermediates/dex/debug/mergeProjectDexDebug/3/classes.dex
-base.4=/home/noob/BARN-scout/app/build/intermediates/dex/debug/mergeProjectDexDebug/4/classes.dex
-base.5=/home/noob/BARN-scout/app/build/intermediates/dex/debug/mergeExtDexDebug/classes2.dex
-base.6=/home/noob/BARN-scout/app/build/intermediates/dex/debug/mergeExtDexDebug/classes3.dex
+#Sun Apr 05 10:58:45 PDT 2026
+base.0=/home/noob/.config/superpowers/worktrees/android/feat-android-proximity-alerts/app/build/intermediates/dex/debug/mergeExtDexDebug/classes.dex
+base.1=/home/noob/.config/superpowers/worktrees/android/feat-android-proximity-alerts/app/build/intermediates/dex/debug/mergeProjectDexDebug/0/classes.dex
+base.2=/home/noob/.config/superpowers/worktrees/android/feat-android-proximity-alerts/app/build/intermediates/dex/debug/mergeProjectDexDebug/11/classes.dex
+base.3=/home/noob/.config/superpowers/worktrees/android/feat-android-proximity-alerts/app/build/intermediates/dex/debug/mergeProjectDexDebug/3/classes.dex
+base.4=/home/noob/.config/superpowers/worktrees/android/feat-android-proximity-alerts/app/build/intermediates/dex/debug/mergeProjectDexDebug/4/classes.dex
+base.5=/home/noob/.config/superpowers/worktrees/android/feat-android-proximity-alerts/app/build/intermediates/dex/debug/mergeProjectDexDebug/8/classes.dex
+base.6=/home/noob/.config/superpowers/worktrees/android/feat-android-proximity-alerts/app/build/intermediates/dex/debug/mergeExtDexDebug/classes2.dex
+base.7=/home/noob/.config/superpowers/worktrees/android/feat-android-proximity-alerts/app/build/intermediates/dex/debug/mergeExtDexDebug/classes3.dex
 path.0=classes.dex
 path.1=0/classes.dex
 path.2=11/classes.dex
 path.3=3/classes.dex
 path.4=4/classes.dex
-path.5=classes2.dex
-path.6=classes3.dex
+path.5=8/classes.dex
+path.6=classes2.dex
+path.7=classes3.dex
 renamed.0=classes.dex
 renamed.1=classes2.dex
 renamed.2=classes3.dex
@@ -20,3 +22,4 @@ renamed.3=classes4.dex
 renamed.4=classes5.dex
 renamed.5=classes6.dex
 renamed.6=classes7.dex
+renamed.7=classes8.dex

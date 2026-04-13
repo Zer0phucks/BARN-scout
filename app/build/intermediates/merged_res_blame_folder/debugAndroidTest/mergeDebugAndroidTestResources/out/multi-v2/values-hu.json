@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.vpt.scout.test.app-mergeDebugAndroidTestResources-32:/values-hu/values-hu.xml",
+            "outputFile": "com.vpt.scout.test.app-mergeDebugAndroidTestResources-1:/values-hu/values-hu.xml",
             "map": [
                 {
                     "source": "/home/noob/.gradle/caches/8.13/transforms/e7e023630b370b036e5a08d8755a42d4/transformed/ui-release/res/values-hu/values-hu.xml",

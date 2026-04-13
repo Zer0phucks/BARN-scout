@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.vpt.scout.test.app-mergeDebugAndroidTestResources-32:/values/values.xml",
+            "outputFile": "com.vpt.scout.test.app-mergeDebugAndroidTestResources-1:/values/values.xml",
             "map": [
                 {
                     "source": "/home/noob/.gradle/caches/8.13/transforms/fe448295b4898d785200b8eac2a7994f/transformed/customview-poolingcontainer-1.0.0/res/values/values.xml",
