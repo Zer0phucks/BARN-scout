@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vpt.scout.SupabaseScannerServiceTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-04-05T10:11:02.028Z" hostname="noobsupreme" time="0.429">
+  <properties/>
+  <testcase name="getList hydrates parcel coordinates and scout state in list order" classname="com.vpt.scout.SupabaseScannerServiceTest" time="0.282"/>
+  <testcase name="getProperties posts scanner filters to get_bills_filtered rpc" classname="com.vpt.scout.SupabaseScannerServiceTest" time="0.005"/>
+  <testcase name="getProperties sends -1 for p_vpt when not filtering to vpt only" classname="com.vpt.scout.SupabaseScannerServiceTest" time="0.004"/>
+  <testcase name="getProperties applies list and unscouted filters client side" classname="com.vpt.scout.SupabaseScannerServiceTest" time="0.087"/>
+  <testcase name="getProperties derives map coordinates from row_json" classname="com.vpt.scout.SupabaseScannerServiceTest" time="0.046"/>
+  <testcase name="getNextProperty posts location filters to the next scoutable property rpc" classname="com.vpt.scout.SupabaseScannerServiceTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> GET http://localhost:43095/rest/v1/lists?select=id,name,description,created_at&id=eq.7
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:43095/rest/v1/lists?select=id,name,description,created_at&id=eq.7 (9ms, 88-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> GET http://localhost:43095/rest/v1/list_properties?select=apn,sort_order&list_id=eq.7&order=sort_order.asc
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:43095/rest/v1/list_properties?select=apn,sort_order&list_id=eq.7&order=sort_order.asc (0ms, 67-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> GET http://localhost:43095/rest/v1/bills?select=apn,location_of_property,city,has_vpt,condition_score,streetview_image_path&apn=in.(%22002-002%22,%22001-001%22)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:43095/rest/v1/bills?select=apn,location_of_property,city,has_vpt,condition_score,streetview_image_path&apn=in.(%22002-002%22,%22001-001%22) (0ms, 309-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> GET http://localhost:43095/rest/v1/parcels?select=APN,row_json&APN=in.(%22002-002%22,%22001-001%22)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:43095/rest/v1/parcels?select=APN,row_json&APN=in.(%22002-002%22,%22001-001%22) (0ms, 178-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> GET http://localhost:43095/rest/v1/scout_results?select=apn&apn=in.(%22002-002%22,%22001-001%22)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:43095/rest/v1/scout_results?select=apn&apn=in.(%22002-002%22,%22001-001%22) (0ms, 19-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> POST http://localhost:52569/rest/v1/rpc/get_bills_filtered (235-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:52569/rest/v1/rpc/get_bills_filtered (1ms, 21-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> POST http://localhost:39685/rest/v1/rpc/get_bills_filtered (233-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:39685/rest/v1/rpc/get_bills_filtered (0ms, 21-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> POST http://localhost:34537/rest/v1/rpc/get_bills_filtered (234-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:34537/rest/v1/rpc/get_bills_filtered (0ms, 227-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> GET http://localhost:34537/rest/v1/scout_results?select=apn
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:34537/rest/v1/scout_results?select=apn (0ms, 19-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> GET http://localhost:34537/rest/v1/list_properties?select=apn&list_id=eq.7&order=sort_order.asc
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:34537/rest/v1/list_properties?select=apn&list_id=eq.7&order=sort_order.asc (0ms, 37-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> POST http://localhost:55967/rest/v1/rpc/get_bills_filtered (233-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:55967/rest/v1/rpc/get_bills_filtered (1ms, 294-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> GET http://localhost:55967/rest/v1/scout_results?select=apn&apn=in.(%22001-100-100%22)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:55967/rest/v1/scout_results?select=apn&apn=in.(%22001-100-100%22) (0ms, 2-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: --> POST http://localhost:35469/rest/v1/rpc/android_get_next_scoutable_property (81-byte body)
+Apr 05, 2026 3:11:02 AM okhttp3.internal.platform.Platform log
+INFO: <-- 200 OK http://localhost:35469/rest/v1/rpc/android_get_next_scoutable_property (1ms, 267-byte body)
+]]></system-err>
+</testsuite>

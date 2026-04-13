@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.vpt.scout.app-mergeDebugResources-64:/values-pt-rBR/values-pt-rBR.xml",
+            "outputFile": "com.vpt.scout.app-mergeDebugResources-2:/values-pt-rBR/values-pt-rBR.xml",
             "map": [
                 {
                     "source": "/home/noob/.gradle/caches/8.13/transforms/6be037af0a9f7bac67dd0efebb048744/transformed/play-services-basement-18.1.0/res/values-pt-rBR/values.xml",
