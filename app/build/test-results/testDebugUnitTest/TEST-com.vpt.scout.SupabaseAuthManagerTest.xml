@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.vpt.scout.SupabaseAuthManagerTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-04-12T20:12:23.954Z" hostname="noobsupreme" time="0.13">
+<testsuite name="com.vpt.scout.SupabaseAuthManagerTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-04-25T04:34:53.904Z" hostname="noobsupreme" time="0.081">
   <properties/>
-  <testcase name="refreshAccessToken signs out when refresh token is missing" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.063"/>
-  <testcase name="signIn returns server error and does not persist session" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.036"/>
+  <testcase name="refreshAccessToken signs out when refresh token is missing" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.034"/>
+  <testcase name="signIn returns server error and does not persist session" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.029"/>
   <testcase name="refreshAccessToken updates tokens and preserves user metadata" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.008"/>
-  <testcase name="signIn persists auth state from supabase response" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.008"/>
-  <testcase name="signOut clears in memory and persisted auth state" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.011"/>
-  <testcase name="refreshAccessTokenSync updates persisted session" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.004"/>
+  <testcase name="signIn persists auth state from supabase response" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.004"/>
+  <testcase name="signOut clears in memory and persisted auth state" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.003"/>
+  <testcase name="refreshAccessTokenSync updates persisted session" classname="com.vpt.scout.SupabaseAuthManagerTest" time="0.003"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

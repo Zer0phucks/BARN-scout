@@ -22,32 +22,43 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.*
 import com.vpt.scout.ListRepository
 import com.vpt.scout.PropertyList
 import com.vpt.scout.PropertyRepository
 import com.vpt.scout.data.local.PropertyEntity
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, FlowPreview::class)
 @Composable
 fun MapScreen(
     propertyRepository: PropertyRepository,
-    collectionRepository: com.vpt.scout.CollectionRepository
+    listRepository: ListRepository
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
     val properties by propertyRepository.cachedMarkers.collectAsState(initial = emptyList())
-    val collections by collectionRepository.allCollections.collectAsState(initial = emptyList())
+    var routes by remember { mutableStateOf<List<PropertyList>>(emptyList()) }
+    var activeRouteId by remember { mutableStateOf<Long?>(null) }
+    var activeRoute by remember { mutableStateOf<com.vpt.scout.ListWithProperties?>(null) }
     
     var selectedProperty by remember { mutableStateOf<PropertyEntity?>(null) }
     var showListDialog by remember { mutableStateOf(false) }
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
+    val lastFetchedBounds = remember { mutableStateOf<LatLngBounds?>(null) }
+    var isLoadingViewport by remember { mutableStateOf(false) }
+    var mapProjectionReady by remember { mutableStateOf(false) }
     
     // FusedLocationProviderClient for getting user location
     val fusedLocationClient = remember {
@@ -70,6 +81,17 @@ fun MapScreen(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(defaultPosition, 14f)
     }
+
+    LaunchedEffect(Unit) {
+        runCatching { listRepository.refreshLists() }
+            .onSuccess { routes = it }
+    }
+
+    LaunchedEffect(activeRouteId) {
+        activeRoute = activeRouteId?.let { listId ->
+            runCatching { listRepository.getList(listId) }.getOrNull()
+        }
+    }
     
     // Calculate distance between two points in miles
     fun calculateDistanceMiles(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
@@ -91,7 +113,7 @@ fun MapScreen(
         } ?: properties.map { it to 0.0 }
     }
     
-    // Get user's current location
+    // Get user's current location; map markers load from Supabase for the visible viewport.
     LaunchedEffect(hasLocationPermission) {
         initializeMapScreen(
             hasLocationPermission = hasLocationPermission,
@@ -103,11 +125,43 @@ fun MapScreen(
                     durationMs = 1000
                 )
             },
-            refreshMarkers = {
-                propertyRepository.refreshMarkers()
-            },
             onLoadingLocationChanged = {}
         )
+    }
+
+    LaunchedEffect(mapProjectionReady) {
+        if (!mapProjectionReady) return@LaunchedEffect
+        // Include projection in the snapshot: `isMoving` alone can sit at false while
+        // projection is still null on first layout, which would skip loading until the user pans.
+        snapshotFlow { cameraPositionState.isMoving to cameraPositionState.projection }
+            .distinctUntilChanged()
+            .filter { (moving, projection) -> !moving && projection != null }
+            .debounce(400L)
+            .collectLatest { (_, projection) ->
+                val proj = projection ?: return@collectLatest
+                val visible = proj.visibleRegion.latLngBounds
+                val fetchBounds = visible.withPaddingFraction(0.25)
+                val loaded = lastFetchedBounds.value
+                if (loaded != null &&
+                    loaded.contains(visible.northeast) &&
+                    loaded.contains(visible.southwest)
+                ) {
+                    return@collectLatest
+                }
+                isLoadingViewport = true
+                selectedProperty = null
+                try {
+                    propertyRepository.refreshMarkersInBounds(
+                        south = fetchBounds.southwest.latitude,
+                        west = fetchBounds.southwest.longitude,
+                        north = fetchBounds.northeast.latitude,
+                        east = fetchBounds.northeast.longitude
+                    )
+                    lastFetchedBounds.value = fetchBounds
+                } finally {
+                    isLoadingViewport = false
+                }
+            }
     }
     
     Scaffold(
@@ -115,12 +169,70 @@ fun MapScreen(
             TopAppBar(
                 title = { Text("Map") },
                 actions = {
-                    IconButton(onClick = {
-                        scope.launch {
-                            propertyRepository.refreshMarkers()
+                    var routesExpanded by remember { mutableStateOf(false) }
+                    if (routes.isNotEmpty()) {
+                        ExposedDropdownMenuBox(
+                            expanded = routesExpanded,
+                            onExpandedChange = { routesExpanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = routes.find { it.id == activeRouteId }?.name ?: "Viewport only",
+                                onValueChange = {},
+                                readOnly = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = routesExpanded) },
+                                modifier = Modifier
+                                    .width(180.dp)
+                                    .menuAnchor()
+                            )
+                            ExposedDropdownMenu(
+                                expanded = routesExpanded,
+                                onDismissRequest = { routesExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Viewport only") },
+                                    onClick = {
+                                        activeRouteId = null
+                                        routesExpanded = false
+                                    }
+                                )
+                                routes.forEach { route ->
+                                    DropdownMenuItem(
+                                        text = { Text(route.name) },
+                                        onClick = {
+                                            activeRouteId = route.id
+                                            routesExpanded = false
+                                        }
+                                    )
+                                }
+                            }
                         }
-                    }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                lastFetchedBounds.value = null
+                                val projection = cameraPositionState.projection ?: return@launch
+                                val visible = projection.visibleRegion.latLngBounds
+                                val fetchBounds = visible.withPaddingFraction(0.25)
+                                isLoadingViewport = true
+                                selectedProperty = null
+                                try {
+                                    propertyRepository.refreshMarkersInBounds(
+                                        south = fetchBounds.southwest.latitude,
+                                        west = fetchBounds.southwest.longitude,
+                                        north = fetchBounds.northeast.latitude,
+                                        east = fetchBounds.northeast.longitude
+                                    )
+                                    lastFetchedBounds.value = fetchBounds
+                                } finally {
+                                    isLoadingViewport = false
+                                }
+                            }
+                        },
+                        enabled = !isLoadingViewport
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh map area")
                     }
                 }
             )
@@ -140,8 +252,44 @@ fun MapScreen(
                 uiSettings = MapUiSettings(
                     zoomControlsEnabled = true,
                     myLocationButtonEnabled = hasLocationPermission
-                )
+                ),
+                onMapLoaded = {
+                    mapProjectionReady = true
+                }
             ) {
+                activeRoute?.properties
+                    ?.filter { it.latitude != null && it.longitude != null }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { routeProperties ->
+                        Polyline(
+                            points = routeProperties.map { LatLng(it.latitude!!, it.longitude!!) },
+                            color = Color(0xFF1565C0),
+                            width = 10f
+                        )
+                        routeProperties.forEachIndexed { index, property ->
+                            Marker(
+                                state = MarkerState(position = LatLng(property.latitude!!, property.longitude!!)),
+                                title = "${index + 1}. ${property.address ?: property.apn}",
+                                snippet = property.apn,
+                                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
+                                onClick = {
+                                    selectedProperty = PropertyEntity(
+                                        apn = property.apn,
+                                        address = property.address ?: property.apn,
+                                        longitude = property.longitude,
+                                        latitude = property.latitude,
+                                        hasVpt = property.hasVpt,
+                                        conditionScore = property.conditionScore,
+                                        city = property.city,
+                                        streetViewImagePath = property.streetviewImagePath,
+                                        updatedAt = java.time.Instant.now()
+                                    )
+                                    true
+                                }
+                            )
+                        }
+                    }
+
                 // Display markers with color coding based on distance
                 sortedProperties.forEachIndexed { index, (property, distance) ->
                     // Color gradient: green for closest, yellow for medium, red for far
@@ -173,6 +321,15 @@ fun MapScreen(
                         }
                     )
                 }
+            }
+
+            if (isLoadingViewport) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                )
             }
             
             // Property info sheet at bottom
@@ -355,12 +512,13 @@ fun MapScreen(
     // Add to List Dialog
     if (showListDialog && selectedProperty != null) {
         AddToListDialog(
-            lists = collections,
+            lists = routes,
             onDismiss = { showListDialog = false },
             onSelect = { listId ->
                 scope.launch {
                     selectedProperty?.let { property ->
-                        collectionRepository.addPropertyToCollection(listId, property.apn)
+                        listRepository.addPropertiesToList(listId, listOf(property.apn))
+                        routes = runCatching { listRepository.refreshLists() }.getOrDefault(routes)
                     }
                     showListDialog = false
                 }
@@ -369,18 +527,33 @@ fun MapScreen(
     }
 }
 
+/**
+ * Expands a visible region so edge markers stay loaded while panning slightly.
+ */
+internal fun LatLngBounds.withPaddingFraction(paddingFraction: Double): LatLngBounds {
+    require(paddingFraction >= 0.0)
+    val latSpan = northeast.latitude - southwest.latitude
+    val lngSpan = northeast.longitude - southwest.longitude
+    val latPad = latSpan * paddingFraction / 2.0
+    val lngPad = lngSpan * paddingFraction / 2.0
+    val sw = LatLng(
+        (southwest.latitude - latPad).coerceIn(-85.0, 85.0),
+        southwest.longitude - lngPad
+    )
+    val ne = LatLng(
+        (northeast.latitude + latPad).coerceIn(-85.0, 85.0),
+        northeast.longitude + lngPad
+    )
+    return LatLngBounds(sw, ne)
+}
+
 internal suspend fun initializeMapScreen(
     hasLocationPermission: Boolean,
     fetchLastLocation: suspend () -> Location?,
     onLocationAvailable: suspend (LatLng) -> Unit,
-    refreshMarkers: suspend () -> Unit,
     onLoadingLocationChanged: (Boolean) -> Unit,
     locationTimeoutMillis: Long = 3_000L
 ) = coroutineScope {
-    val refreshJob = launch {
-        refreshMarkers()
-    }
-
     try {
         if (hasLocationPermission) {
             val location = withTimeoutOrNull(locationTimeoutMillis) {
@@ -395,8 +568,6 @@ internal suspend fun initializeMapScreen(
     } finally {
         onLoadingLocationChanged(false)
     }
-
-    refreshJob.join()
 }
 
 @Composable

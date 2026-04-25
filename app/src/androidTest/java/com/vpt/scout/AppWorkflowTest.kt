@@ -264,6 +264,11 @@ private class WorkflowScannerDataService(
         listProperties[listId]?.removeAll { it.apn == apn }
     }
 
+    override suspend fun reorderListProperties(listId: Long, apns: List<String>) {
+        val existing = listProperties[listId].orEmpty().associateBy { it.apn }
+        listProperties[listId] = apns.mapNotNull { existing[it] }.toMutableList()
+    }
+
     override suspend fun getListRoute(listId: Long): RouteResponse =
         RouteResponse(url = "https://example.com", propertyCount = listProperties[listId]?.size ?: 0, optimized = true)
 

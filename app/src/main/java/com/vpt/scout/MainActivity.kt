@@ -98,8 +98,8 @@ internal fun areInitialProximityPermissionsGranted(
 }
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Properties : Screen("properties", "Properties", Icons.Default.List)
-    object Lists : Screen("lists", "Lists", Icons.Default.Folder)
+    object Explore : Screen("explore", "Explore", Icons.Default.Search)
+    object Route : Screen("route", "Route", Icons.Default.Route)
     object Map : Screen("map", "Map", Icons.Default.Map)
     object Stats : Screen("stats", "Stats", Icons.Default.BarChart)
 }
@@ -152,7 +152,7 @@ fun ScoutApp(
         }
     }
     
-    val bottomNavScreens = listOf(Screen.Properties, Screen.Lists, Screen.Map, Screen.Stats)
+    val bottomNavScreens = listOf(Screen.Explore, Screen.Route, Screen.Map, Screen.Stats)
     // Show bottom bar for main tabs only (not for detail screens)
     val showBottomBar = currentRoute in bottomNavScreens.map { it.route }
     
@@ -180,11 +180,10 @@ fun ScoutApp(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Properties.route,
+            startDestination = Screen.Explore.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // Main Properties Screen (WebUI-like table)
-            composable(Screen.Properties.route) {
+            composable(Screen.Explore.route) {
                 PropertiesScreen(
                     propertyRepository = container.propertyRepository,
                     listRepository = container.listRepository,
@@ -203,8 +202,7 @@ fun ScoutApp(
                 )
             }
             
-            // Lists Screen (renamed from Collections)
-            composable(Screen.Lists.route) {
+            composable(Screen.Route.route) {
                 ListsScreen(
                     listRepository = container.listRepository,
                     onNavigateToList = { listId ->
@@ -217,7 +215,7 @@ fun ScoutApp(
             composable(Screen.Map.route) {
                 MapScreen(
                     propertyRepository = container.propertyRepository,
-                    collectionRepository = container.collectionRepository
+                    listRepository = container.listRepository
                 )
             }
             

@@ -64,6 +64,148 @@ class SupabaseScannerServiceTest {
     }
 
     @Test
+    fun `getProperties posts the full shared filter contract to get_bills_filtered rpc`() = runBlocking {
+        server.enqueueJson("""{"rows":[],"total":0}""")
+        server.enqueueJson("""[]""")
+
+        val service = SupabaseScannerService(
+            baseUrl = server.url("/").toString(),
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null
+        )
+
+        service.getProperties(
+            filters = PropertyFilters(
+                city = "Oakland",
+                query = "elm",
+                zip = "94601,94602",
+                power = "off",
+                favoritesOnly = true,
+                vptOnly = true,
+                delinquentOnly = true,
+                condition = "poor",
+                outOfStateOnly = true,
+                research = "complete",
+                ownerName = "smith",
+                sort = "condition_score",
+                order = "desc"
+            ),
+            page = 3,
+            perPage = 25
+        )
+
+        val body = server.takeRequest().body.readUtf8()
+        assertTrue(body.contains("\"p_q\":\"elm\""))
+        assertTrue(body.contains("\"p_zip\":\"94601,94602\""))
+        assertTrue(body.contains("\"p_power\":\"off\""))
+        assertTrue(body.contains("\"p_fav\":1"))
+        assertTrue(body.contains("\"p_city\":\"OAKLAND\""))
+        assertTrue(body.contains("\"p_vpt\":1"))
+        assertTrue(body.contains("\"p_delinquent\":1"))
+        assertTrue(body.contains("\"p_condition\":\"poor\""))
+        assertTrue(body.contains("\"p_outofstate\":1"))
+        assertTrue(body.contains("\"p_research\":\"complete\""))
+        assertTrue(body.contains("\"p_owner_name\":\"smith\""))
+        assertTrue(body.contains("\"p_sort\":\"condition_score\""))
+        assertTrue(body.contains("\"p_order\":\"desc\""))
+        assertTrue(body.contains("\"p_limit\":25"))
+        assertTrue(body.contains("\"p_offset\":50"))
+    }
+
+    @Test
+    fun `getMapPropertiesInBounds uses map rpc row json coordinates and filters to viewport`() = runBlocking {
+        server.enqueueJson(
+            """
+            [
+              {
+                "apn": "inside",
+                "location_of_property": "101 First St",
+                "city": "OAKLAND",
+                "has_vpt": 1,
+                "row_json": {
+                  "CENTROID_X": "-13603237.85",
+                  "CENTROID_Y": "4547675.35"
+                }
+              },
+              {
+                "apn": "outside",
+                "location_of_property": "999 Far St",
+                "city": "OAKLAND",
+                "has_vpt": 1,
+                "row_json": {
+                  "CENTROID_X": "-13500000.00",
+                  "CENTROID_Y": "4547675.35"
+                }
+              }
+            ]
+            """.trimIndent()
+        )
+
+        val service = SupabaseScannerService(
+            baseUrl = server.url("/").toString(),
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null
+        )
+
+        val properties = service.getMapPropertiesInBounds(
+            south = 37.7,
+            west = -122.3,
+            north = 37.9,
+            east = -122.1
+        )
+
+        val request = server.takeRequest()
+        assertEquals("/rest/v1/rpc/get_bills_for_map", request.path)
+        assertEquals(listOf("inside"), properties.map { it.apn })
+        assertTrue(properties.single().latitude != null)
+        assertTrue(properties.single().longitude != null)
+    }
+
+    @Test
+    fun `addPropertiesToList appends through route queue rpc`() = runBlocking {
+        server.enqueueJson("""{"added":2}""")
+
+        val service = SupabaseScannerService(
+            baseUrl = server.url("/").toString(),
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null
+        )
+
+        service.addPropertiesToList(7L, AddPropertiesRequest(listOf("002", "003")))
+
+        val request = server.takeRequest()
+        assertEquals("/rest/v1/rpc/append_properties_to_list", request.path)
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("\"p_list_id\":7"))
+        assertTrue(body.contains("\"002\""))
+        assertTrue(body.contains("\"003\""))
+    }
+
+    @Test
+    fun `reorderListProperties posts ordered apns to route queue rpc`() = runBlocking {
+        server.enqueueJson("""{"updated":3}""")
+
+        val service = SupabaseScannerService(
+            baseUrl = server.url("/").toString(),
+            anonKey = "anon-key",
+            accessTokenProvider = { "jwt-token" },
+            authManager = null
+        )
+
+        service.reorderListProperties(7L, listOf("003", "001", "002"))
+
+        val request = server.takeRequest()
+        assertEquals("/rest/v1/rpc/reorder_list_properties", request.path)
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("\"p_list_id\":7"))
+        assertTrue(body.indexOf("003") < body.indexOf("001"))
+        assertTrue(body.indexOf("001") < body.indexOf("002"))
+    }
+
+    @Test
     fun `getNextProperty posts location filters to the next scoutable property rpc`() = runBlocking {
         server.enqueueJson(
             """

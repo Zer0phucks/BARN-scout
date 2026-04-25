@@ -66,58 +66,53 @@ class SupabaseRepositoryTest {
     }
 
     @Test
-    fun `refreshMarkers replaces cache with mappable properties only`() = runBlocking {
+    fun `refreshMarkersInBounds replaces cache with mappable properties only`() = runBlocking {
         val propertyDao = FakePropertyDao()
         val service = FakeScannerDataService(
-            pagedProperties = listOf(
-                PropertiesResponse(
-                    properties = listOf(
-                        testProperty(apn = "001", latitude = 37.8, longitude = -122.2),
-                        testProperty(apn = "002", latitude = null, longitude = -122.3)
-                    ),
-                    total = 2,
-                    page = 1,
-                    perPage = 200,
-                    totalPages = 1
-                )
+            mapInBoundsProperties = listOf(
+                testProperty(apn = "001", latitude = 37.8, longitude = -122.2),
+                testProperty(apn = "002", latitude = null, longitude = -122.3)
             )
         )
         val repository = PropertyRepository(propertyDao = propertyDao, service = service)
 
-        repository.refreshMarkers()
+        repository.refreshMarkersInBounds(
+            south = 37.0,
+            west = -123.0,
+            north = 38.0,
+            east = -122.0
+        )
 
         val cached = repository.cachedMarkers.first()
         assertEquals(listOf("001"), cached.map { it.apn })
         assertEquals(1, propertyDao.deleteAllCalls)
+        assertEquals(1, service.mapBoundsCalls.size)
     }
 
     @Test
-    fun `refreshMarkers streams map pages into cache using larger page size`() = runBlocking {
+    fun `refreshMarkersInBounds forwards bounds to map query`() = runBlocking {
         val propertyDao = FakePropertyDao()
         val service = FakeScannerDataService(
-            pagedProperties = listOf(
-                PropertiesResponse(
-                    properties = listOf(testProperty(apn = "001", latitude = 37.8, longitude = -122.2)),
-                    total = 2,
-                    page = 1,
-                    perPage = 1000,
-                    totalPages = 2
-                ),
-                PropertiesResponse(
-                    properties = listOf(testProperty(apn = "002", latitude = 37.9, longitude = -122.3)),
-                    total = 2,
-                    page = 2,
-                    perPage = 1000,
-                    totalPages = 2
-                )
+            mapInBoundsProperties = listOf(
+                testProperty(apn = "001", latitude = 37.8, longitude = -122.2),
+                testProperty(apn = "002", latitude = 37.9, longitude = -122.3)
             )
         )
         val repository = PropertyRepository(propertyDao = propertyDao, service = service)
 
-        repository.refreshMarkers()
+        repository.refreshMarkersInBounds(
+            south = 1.0,
+            west = 2.0,
+            north = 3.0,
+            east = 4.0
+        )
 
-        assertEquals(listOf(1 to 1000, 2 to 1000), service.propertyRequests)
-        assertEquals(2, propertyDao.insertAllCalls)
+        val call = service.mapBoundsCalls.single()
+        assertEquals(1.0, call.south, 0.0)
+        assertEquals(2.0, call.west, 0.0)
+        assertEquals(3.0, call.north, 0.0)
+        assertEquals(4.0, call.east, 0.0)
+        assertEquals(1, propertyDao.insertAllCalls)
         assertEquals(listOf("001", "002"), repository.cachedMarkers.first().map { it.apn }.sorted())
     }
 
@@ -160,6 +155,20 @@ class SupabaseRepositoryTest {
     }
 
     @Test
+    fun `listRepository reorderListProperties delegates ordered queue to service`() = runBlocking {
+        val service = FakeScannerDataService(
+            initialLists = mutableListOf(
+                PropertyList(id = 7, name = "Route", description = null, propertyCount = 3)
+            )
+        )
+        val repository = ListRepository(service)
+
+        repository.reorderListProperties(7L, listOf("003", "001", "002"))
+
+        assertEquals(7L to listOf("003", "001", "002"), service.reorderCalls.single())
+    }
+
+    @Test
     fun `scoutRepository getStats delegates to service`() = runBlocking {
         val repository = ScoutRepository(
             service = FakeScannerDataService(
@@ -181,17 +190,39 @@ class SupabaseRepositoryTest {
     }
 }
 
+private data class MapBoundsCall(
+    val south: Double,
+    val west: Double,
+    val north: Double,
+    val east: Double,
+    val limit: Int
+)
+
 private class FakeScannerDataService(
     private val submitScoutResultError: Throwable? = null,
     private val pagedProperties: List<PropertiesResponse> = listOf(
         PropertiesResponse(emptyList(), 0, 1, 50, 1)
     ),
+    private val mapInBoundsProperties: List<Property> = emptyList(),
     initialLists: MutableList<PropertyList> = mutableListOf(),
     private val scoutStats: ScoutStats = ScoutStats(0, 0, 0, 0)
 ) : ScannerDataService {
     private val lists = initialLists
     private var nextListId = (lists.maxOfOrNull { it.id } ?: 0L) + 1L
     val propertyRequests = mutableListOf<Pair<Int, Int>>()
+    val mapBoundsCalls = mutableListOf<MapBoundsCall>()
+    val reorderCalls = mutableListOf<Pair<Long, List<String>>>()
+
+    override suspend fun getMapPropertiesInBounds(
+        south: Double,
+        west: Double,
+        north: Double,
+        east: Double,
+        limit: Int
+    ): List<Property> {
+        mapBoundsCalls += MapBoundsCall(south, west, north, east, limit)
+        return mapInBoundsProperties
+    }
 
     override suspend fun getProperties(
         filters: PropertyFilters,
@@ -247,6 +278,10 @@ private class FakeScannerDataService(
     }
 
     override suspend fun removePropertyFromList(listId: Long, apn: String) {
+    }
+
+    override suspend fun reorderListProperties(listId: Long, apns: List<String>) {
+        reorderCalls += listId to apns
     }
 
     override suspend fun getListRoute(listId: Long): RouteResponse {

@@ -12,8 +12,7 @@ import org.junit.Test
 class MapScreenInitializationTest {
 
     @Test
-    fun `initializeMapScreen refreshes markers even if location lookup times out`() = runBlocking {
-        var markersRefreshed = false
+    fun `initializeMapScreen completes even if location lookup times out`() = runBlocking {
         var loading = true
         var centeredLocation: LatLng? = null
 
@@ -21,12 +20,10 @@ class MapScreenInitializationTest {
             hasLocationPermission = true,
             fetchLastLocation = { suspendCancellableCoroutine { } },
             onLocationAvailable = { centeredLocation = it },
-            refreshMarkers = { markersRefreshed = true },
             onLoadingLocationChanged = { loading = it },
             locationTimeoutMillis = 1
         )
 
-        assertTrue(markersRefreshed)
         assertFalse(loading)
         assertEquals(null, centeredLocation)
     }

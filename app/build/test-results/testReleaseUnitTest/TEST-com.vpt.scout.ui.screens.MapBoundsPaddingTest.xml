@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.vpt.scout.ui.screens.MapBoundsPaddingTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-25T04:34:59.014Z" hostname="noobsupreme" time="0.001">
+  <properties/>
+  <testcase name="withPaddingFraction contains original corners" classname="com.vpt.scout.ui.screens.MapBoundsPaddingTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

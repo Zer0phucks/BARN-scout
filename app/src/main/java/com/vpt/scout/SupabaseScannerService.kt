@@ -20,6 +20,13 @@ private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
 interface ScannerDataService {
     suspend fun getProperties(filters: PropertyFilters, page: Int = 1, perPage: Int = 50): PropertiesResponse
+    suspend fun getMapPropertiesInBounds(
+        south: Double,
+        west: Double,
+        north: Double,
+        east: Double,
+        limit: Int = 1000
+    ): List<Property>
     suspend fun getNextProperty(
         latitude: Double,
         longitude: Double,
@@ -34,6 +41,7 @@ interface ScannerDataService {
     suspend fun getList(listId: Long): ListWithProperties
     suspend fun deleteList(listId: Long)
     suspend fun addPropertiesToList(listId: Long, request: AddPropertiesRequest)
+    suspend fun reorderListProperties(listId: Long, apns: List<String>)
     suspend fun removePropertyFromList(listId: Long, apn: String)
     suspend fun getListRoute(listId: Long): RouteResponse
     suspend fun submitScoutResult(request: ScoutResultRequest)
@@ -48,6 +56,52 @@ class SupabaseScannerService(
     private val authManager: SupabaseAuthManager? = null,
     private val client: OkHttpClient = buildClient(accessTokenProvider, authManager)
 ) : ScannerDataService {
+
+    override suspend fun getMapPropertiesInBounds(
+        south: Double,
+        west: Double,
+        north: Double,
+        east: Double,
+        limit: Int
+    ): List<Property> = withContext(Dispatchers.IO) {
+        val body = JsonObject().apply {
+            addProperty("p_q", "")
+            addProperty("p_zip", "")
+            addProperty("p_power", "")
+            addProperty("p_fav", -1)
+            addProperty("p_city", "")
+            addProperty("p_vpt", -1)
+            addProperty("p_delinquent", -1)
+        }
+
+        val request = Request.Builder()
+            .url("${baseUrl.trimEnd('/')}/rest/v1/rpc/get_bills_for_map")
+            .applySupabaseHeaders()
+            .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        val rows = client.newCall(request).execute().use { response ->
+            response.requireSuccess()
+            extractRpcArrayPayload(response.body?.string().orEmpty(), "get_bills_for_map")
+        }
+        val bounded = buildList {
+            for (index in 0 until rows.size()) {
+                val property = rows.get(index).asJsonObject.toProperty()
+                val latitude = property.latitude ?: continue
+                val longitude = property.longitude ?: continue
+                val inLatitude = latitude in south..north
+                val inLongitude = if (west <= east) {
+                    longitude in west..east
+                } else {
+                    longitude >= west || longitude <= east
+                }
+                if (inLatitude && inLongitude) {
+                    add(property)
+                }
+            }
+        }
+        bounded.take(limit.coerceIn(1, 5000))
+    }
 
     override suspend fun getNextProperty(
         latitude: Double,
@@ -326,19 +380,41 @@ class SupabaseScannerService(
         if (request.apns.isEmpty()) {
             return@withContext
         }
-        val body = JsonArray().apply {
-            request.apns.forEachIndexed { index, apn ->
-                add(JsonObject().apply {
-                    addProperty("list_id", listId)
-                    addProperty("apn", apn)
-                    addProperty("sort_order", index)
-                })
-            }
+        val body = JsonObject().apply {
+            addProperty("p_list_id", listId)
+            add(
+                "p_apns",
+                JsonArray().apply {
+                    request.apns.forEach { add(it) }
+                }
+            )
         }
 
         client.newCall(
             Request.Builder()
-                .url("${baseUrl.trimEnd('/')}/rest/v1/list_properties")
+                .url("${baseUrl.trimEnd('/')}/rest/v1/rpc/append_properties_to_list")
+                .applySupabaseHeaders()
+                .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+        ).execute().use { response ->
+            response.requireSuccess()
+        }
+    }
+
+    override suspend fun reorderListProperties(listId: Long, apns: List<String>) = withContext(Dispatchers.IO) {
+        val body = JsonObject().apply {
+            addProperty("p_list_id", listId)
+            add(
+                "p_apns",
+                JsonArray().apply {
+                    apns.forEach { add(it) }
+                }
+            )
+        }
+
+        client.newCall(
+            Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/rest/v1/rpc/reorder_list_properties")
                 .applySupabaseHeaders()
                 .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -453,20 +529,20 @@ class SupabaseScannerService(
     ): PropertiesResponse {
         val body = JsonObject().apply {
             addProperty("p_q", filters.query.orEmpty())
-            addProperty("p_zip", "")
-            addProperty("p_power", "")
-            addProperty("p_fav", -1)
+            addProperty("p_zip", filters.zip.orEmpty())
+            addProperty("p_power", filters.power.orEmpty())
+            addProperty("p_fav", if (filters.favoritesOnly) 1 else -1)
             addProperty("p_city", filters.city?.trim()?.uppercase().orEmpty())
             addProperty("p_vpt", if (filters.vptOnly) 1 else -1)
-            addProperty("p_delinquent", -1)
-            addProperty("p_condition", "")
-            addProperty("p_outofstate", -1)
-            addProperty("p_sort", "location_of_property")
-            addProperty("p_order", "asc")
+            addProperty("p_delinquent", if (filters.delinquentOnly) 1 else -1)
+            addProperty("p_condition", filters.condition.orEmpty())
+            addProperty("p_outofstate", if (filters.outOfStateOnly) 1 else -1)
+            addProperty("p_sort", filters.sort)
+            addProperty("p_order", filters.order)
             addProperty("p_limit", perPage)
             addProperty("p_offset", (page - 1) * perPage)
-            addProperty("p_research", "")
-            addProperty("p_owner_name", "")
+            addProperty("p_research", filters.research.orEmpty())
+            addProperty("p_owner_name", filters.ownerName.orEmpty())
         }
 
         val request = Request.Builder()
@@ -526,6 +602,31 @@ class SupabaseScannerService(
         } else {
             candidate
         }
+    }
+
+    private fun extractRpcArrayPayload(rawBody: String, rpcName: String): JsonArray {
+        if (rawBody.isBlank()) {
+            return JsonArray()
+        }
+
+        val parsed = JsonParser().parse(rawBody)
+        if (parsed.isJsonArray) {
+            val array = parsed.asJsonArray
+            if (array.size() == 1 && array[0].isJsonObject) {
+                val wrapped = array[0].asJsonObject.get(rpcName)
+                if (wrapped != null && wrapped.isJsonArray) {
+                    return wrapped.asJsonArray
+                }
+            }
+            return array
+        }
+        if (parsed.isJsonObject) {
+            val wrapped = parsed.asJsonObject.get(rpcName)
+            if (wrapped != null && wrapped.isJsonArray) {
+                return wrapped.asJsonArray
+            }
+        }
+        return JsonArray()
     }
 
     private fun fetchAllProperties(filters: PropertyFilters): List<Property> {

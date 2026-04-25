@@ -26,7 +26,17 @@ class PropertyRepository(
         perPage: Int = 50,
         city: String? = null,
         query: String? = null,
+        zip: String? = null,
+        power: String? = null,
+        favoritesOnly: Boolean = false,
         vptOnly: Boolean = false,
+        delinquentOnly: Boolean = false,
+        condition: String? = null,
+        outOfStateOnly: Boolean = false,
+        research: String? = null,
+        ownerName: String? = null,
+        sort: String = "location_of_property",
+        order: String = "asc",
         scouted: Boolean? = null,
         listId: Long? = null
     ): PropertiesResponse {
@@ -34,7 +44,17 @@ class PropertyRepository(
             filters = PropertyFilters(
                 city = city,
                 query = query,
+                zip = zip,
+                power = power,
+                favoritesOnly = favoritesOnly,
                 vptOnly = vptOnly,
+                delinquentOnly = delinquentOnly,
+                condition = condition,
+                outOfStateOnly = outOfStateOnly,
+                research = research,
+                ownerName = ownerName,
+                sort = sort,
+                order = order,
                 scouted = scouted,
                 listId = listId
             ),
@@ -73,21 +93,39 @@ class PropertyRepository(
     }
     
     /**
-     * Refresh map markers from API and cache locally.
+     * Refresh map markers for the currently visible map bounds only.
      */
-    suspend fun refreshMarkers() {
+    suspend fun refreshMarkersInBounds(
+        south: Double,
+        west: Double,
+        north: Double,
+        east: Double
+    ) {
         try {
+            val boundedProperties = service.getMapPropertiesInBounds(
+                south = south,
+                west = west,
+                north = north,
+                east = east
+            )
+            val entities = boundedProperties.mapNotNull { property ->
+                val latitude = property.latitude ?: return@mapNotNull null
+                val longitude = property.longitude ?: return@mapNotNull null
+                PropertyEntity(
+                    apn = property.apn,
+                    address = property.address ?: "Unknown",
+                    longitude = longitude,
+                    latitude = latitude,
+                    hasVpt = property.hasVpt,
+                    conditionScore = property.conditionScore,
+                    city = property.city,
+                    streetViewImagePath = property.streetviewImagePath,
+                    updatedAt = Instant.now()
+                )
+            }
             propertyDao.deleteAll()
-            collectAllFilteredMapMarkerEntities(
-                filters = PropertyFilters(),
-                fetchPage = { filters, page, perPage ->
-                    service.getProperties(filters, page, perPage)
-                },
-                perPage = 1000
-            ) { pageEntities ->
-                if (pageEntities.isNotEmpty()) {
-                    propertyDao.insertAll(pageEntities)
-                }
+            if (entities.isNotEmpty()) {
+                propertyDao.insertAll(entities)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -111,7 +149,17 @@ class PropertyRepository(
     suspend fun loadAllPropertyApns(
         city: String? = null,
         query: String? = null,
+        zip: String? = null,
+        power: String? = null,
+        favoritesOnly: Boolean = false,
         vptOnly: Boolean = false,
+        delinquentOnly: Boolean = false,
+        condition: String? = null,
+        outOfStateOnly: Boolean = false,
+        research: String? = null,
+        ownerName: String? = null,
+        sort: String = "location_of_property",
+        order: String = "asc",
         scouted: Boolean? = null,
         listId: Long? = null
     ): Set<String> {
@@ -125,7 +173,17 @@ class PropertyRepository(
                 perPage = 500, // Fetch in larger batches for efficiency
                 city = city,
                 query = query,
+                zip = zip,
+                power = power,
+                favoritesOnly = favoritesOnly,
                 vptOnly = vptOnly,
+                delinquentOnly = delinquentOnly,
+                condition = condition,
+                outOfStateOnly = outOfStateOnly,
+                research = research,
+                ownerName = ownerName,
+                sort = sort,
+                order = order,
                 scouted = scouted,
                 listId = listId
             )
@@ -141,7 +199,17 @@ class PropertyRepository(
 data class PropertyFilters(
     val city: String? = null,
     val query: String? = null,
+    val zip: String? = null,
+    val power: String? = null,
+    val favoritesOnly: Boolean = false,
     val vptOnly: Boolean = false,
+    val delinquentOnly: Boolean = false,
+    val condition: String? = null,
+    val outOfStateOnly: Boolean = false,
+    val research: String? = null,
+    val ownerName: String? = null,
+    val sort: String = "location_of_property",
+    val order: String = "asc",
     val scouted: Boolean? = null,
     val listId: Long? = null
 )
@@ -210,6 +278,10 @@ class ListRepository(
      */
     suspend fun removePropertyFromList(listId: Long, apn: String) {
         service.removePropertyFromList(listId, apn)
+    }
+
+    suspend fun reorderListProperties(listId: Long, apns: List<String>) {
+        service.reorderListProperties(listId, apns)
     }
     
     /**

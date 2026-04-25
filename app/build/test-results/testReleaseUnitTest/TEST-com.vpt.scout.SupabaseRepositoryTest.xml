@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.vpt.scout.SupabaseRepositoryTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-04-12T20:12:29.409Z" hostname="noobsupreme" time="0.007">
+<testsuite name="com.vpt.scout.SupabaseRepositoryTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-04-25T04:34:58.453Z" hostname="noobsupreme" time="0.007">
   <properties/>
-  <testcase name="mapPropertiesResponseToEntities skips properties without coordinates" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.002"/>
-  <testcase name="refreshMarkers streams map pages into cache using larger page size" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.002"/>
-  <testcase name="loadAllPropertyApns collects apns across all pages" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.001"/>
-  <testcase name="submitScoutResult fails when supabase write fails" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.0"/>
-  <testcase name="listRepository createList refreshes lists state" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.001"/>
-  <testcase name="refreshMarkers replaces cache with mappable properties only" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.0"/>
+  <testcase name="refreshMarkersInBounds replaces cache with mappable properties only" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.004"/>
+  <testcase name="mapPropertiesResponseToEntities skips properties without coordinates" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.0"/>
+  <testcase name="loadAllPropertyApns collects apns across all pages" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.0"/>
+  <testcase name="submitScoutResult fails when supabase write fails" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.001"/>
+  <testcase name="listRepository createList refreshes lists state" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.0"/>
+  <testcase name="listRepository reorderListProperties delegates ordered queue to service" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.001"/>
+  <testcase name="refreshMarkersInBounds forwards bounds to map query" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.0"/>
   <testcase name="scoutRepository getStats delegates to service" classname="com.vpt.scout.SupabaseRepositoryTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

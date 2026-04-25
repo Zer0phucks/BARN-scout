@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.vpt.scout.MapScreenInitializationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-12T20:12:23.926Z" hostname="noobsupreme" time="0.024">
+<testsuite name="com.vpt.scout.MapScreenInitializationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-25T04:34:53.884Z" hostname="noobsupreme" time="0.018">
   <properties/>
-  <testcase name="initializeMapScreen refreshes markers even if location lookup times out" classname="com.vpt.scout.MapScreenInitializationTest" time="0.024"/>
+  <testcase name="initializeMapScreen completes even if location lookup times out" classname="com.vpt.scout.MapScreenInitializationTest" time="0.018"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

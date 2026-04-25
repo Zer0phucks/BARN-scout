@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.vpt.scout.proximity.ProximityAlertCoordinatorTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-04-12T20:12:29.863Z" hostname="noobsupreme" time="0.001">
+<testsuite name="com.vpt.scout.proximity.ProximityAlertCoordinatorTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-04-25T04:34:58.924Z" hostname="noobsupreme" time="0.001">
   <properties/>
   <testcase name="does not notify again when closest property was already alerted and remains inside threshold" classname="com.vpt.scout.proximity.ProximityAlertCoordinatorTest" time="0.001"/>
   <testcase name="returns an alert when nearest property enters threshold and was not previously alerted" classname="com.vpt.scout.proximity.ProximityAlertCoordinatorTest" time="0.0"/>

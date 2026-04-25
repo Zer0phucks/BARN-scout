@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.vpt.scout.proximity.ProximityAlertPreferencesTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-12T20:12:29.865Z" hostname="noobsupreme" time="0.053">
+<testsuite name="com.vpt.scout.proximity.ProximityAlertPreferencesTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-04-25T04:34:58.926Z" hostname="noobsupreme" time="0.052">
   <properties/>
-  <testcase name="selected threshold persists as 1000 feet" classname="com.vpt.scout.proximity.ProximityAlertPreferencesTest" time="0.053"/>
+  <testcase name="selected threshold persists as 1000 feet" classname="com.vpt.scout.proximity.ProximityAlertPreferencesTest" time="0.052"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

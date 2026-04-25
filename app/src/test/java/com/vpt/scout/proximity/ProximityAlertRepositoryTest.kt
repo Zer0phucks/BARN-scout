@@ -84,6 +84,14 @@ private class FakeProximityScannerDataService(
     var lastGetNextListId: Long? = null
     var lastPropertiesQuery: String? = null
 
+    override suspend fun getMapPropertiesInBounds(
+        south: Double,
+        west: Double,
+        north: Double,
+        east: Double,
+        limit: Int
+    ): List<Property> = emptyList()
+
     override suspend fun getProperties(
         filters: PropertyFilters,
         page: Int,
@@ -132,6 +140,8 @@ private class FakeProximityScannerDataService(
     override suspend fun addPropertiesToList(listId: Long, request: AddPropertiesRequest) {}
 
     override suspend fun removePropertyFromList(listId: Long, apn: String) {}
+
+    override suspend fun reorderListProperties(listId: Long, apns: List<String>) {}
 
     override suspend fun getListRoute(listId: Long): RouteResponse {
         error("Not needed in this test")
