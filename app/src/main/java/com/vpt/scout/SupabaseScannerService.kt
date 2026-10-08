@@ -6,6 +6,8 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Authenticator
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -17,6 +19,28 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+internal const val MAP_MARKER_COLUMNS =
+    "apn,location,city,situs_zip,zip_code,lat,lng,has_vpt,delinquent,power_status,condition_score," +
+        "streetview_image_path,research_status,owner_name,deceased_count,last_sale_date,tax_year," +
+        "last_payment,mailing_address,is_out_of_state,is_favorite,is_scouted"
+
+/** App sort keys (bills column names) -> map_markers columns. */
+private val SORT_COLUMNS = mapOf(
+    "location_of_property" to "location",
+    "apn" to "apn",
+    "city" to "city",
+    "added_at" to "added_at",
+    "condition_score" to "condition_score",
+    "has_vpt" to "has_vpt",
+    "delinquent" to "delinquent",
+    "power_status" to "power_status",
+    "last_payment" to "last_payment",
+    "tax_year" to "tax_year",
+    "situs_zip" to "situs_zip",
+    "deceased_count" to "deceased_count",
+    "outreach_score" to "outreach_score"
+)
 
 interface ScannerDataService {
     suspend fun getProperties(filters: PropertyFilters, page: Int = 1, perPage: Int = 50): PropertiesResponse
@@ -64,43 +88,24 @@ class SupabaseScannerService(
         east: Double,
         limit: Int
     ): List<Property> = withContext(Dispatchers.IO) {
-        val body = JsonObject().apply {
-            addProperty("p_q", "")
-            addProperty("p_zip", "")
-            addProperty("p_power", "")
-            addProperty("p_fav", -1)
-            addProperty("p_city", "")
-            addProperty("p_vpt", -1)
-            addProperty("p_delinquent", -1)
-        }
-
-        val request = Request.Builder()
-            .url("${baseUrl.trimEnd('/')}/rest/v1/rpc/get_bills_for_map")
-            .applySupabaseHeaders()
-            .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-
-        val rows = client.newCall(request).execute().use { response ->
-            response.requireSuccess()
-            extractRpcArrayPayload(response.body?.string().orEmpty(), "get_bills_for_map")
-        }
-        val bounded = buildList {
-            for (index in 0 until rows.size()) {
-                val property = rows.get(index).asJsonObject.toProperty()
-                val latitude = property.latitude ?: continue
-                val longitude = property.longitude ?: continue
-                val inLatitude = latitude in south..north
-                val inLongitude = if (west <= east) {
-                    longitude in west..east
-                } else {
-                    longitude >= west || longitude <= east
-                }
-                if (inLatitude && inLongitude) {
-                    add(property)
-                }
+        val url = mapMarkersUrl().apply {
+            addQueryParameter("select", MAP_MARKER_COLUMNS)
+            addQueryParameter("lat", "gte.$south")
+            addQueryParameter("lat", "lte.$north")
+            if (west <= east) {
+                addQueryParameter("lng", "gte.$west")
+                addQueryParameter("lng", "lte.$east")
+            } else {
+                // Viewport straddles the antimeridian.
+                addQueryParameter("or", "(lng.gte.$west,lng.lte.$east)")
             }
-        }
-        bounded.take(limit.coerceIn(1, 5000))
+            addQueryParameter("limit", limit.coerceIn(1, 5000).toString())
+        }.build()
+
+        val rows = executeJsonArrayRequest(
+            Request.Builder().url(url).applySupabaseHeaders().get().build()
+        )
+        rows.map { it.asJsonObject.toProperty() }
     }
 
     override suspend fun getNextProperty(
@@ -115,44 +120,26 @@ class SupabaseScannerService(
         val body = JsonObject().apply {
             addProperty("p_lat", latitude)
             addProperty("p_lng", longitude)
-            addProperty("p_city", city?.trim()?.uppercase().orEmpty())
-            addProperty("p_list_id", listId)
-            addProperty("p_q", "")
-            addProperty("p_vpt", if (vptOnly) 1 else -1)
-            if (conditionMin != null) {
-                addProperty("p_condition_min", conditionMin)
-            }
-            if (conditionMax != null) {
-                addProperty("p_condition_max", conditionMax)
-            }
+            city?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }?.let { addProperty("p_city", it) }
+            addProperty("p_vpt_only", vptOnly)
+            listId?.let { addProperty("p_list_id", it) }
+            conditionMin?.let { addProperty("p_condition_min", it) }
+            conditionMax?.let { addProperty("p_condition_max", it) }
+            addProperty("p_limit", 1)
         }
 
-        val request = Request.Builder()
-            .url("${baseUrl.trimEnd('/')}/rest/v1/rpc/android_get_next_scoutable_property")
-            .addHeader("apikey", anonKey)
-            .addHeader("Authorization", "Bearer ${accessTokenProvider().orEmpty()}")
-            .addHeader("Content-Type", "application/json")
-            .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            response.requireSuccess()
-            val rawBody = response.body?.string().orEmpty()
-            if (rawBody.isBlank()) {
-                return@use NextPropertyResponse(property = null, remaining = 0)
-            }
-            val payload = extractRpcPayload(rawBody, "android_get_next_scoutable_property")
-            val propertyJson = payload.get("property")
-            val property = if (propertyJson == null || propertyJson.isJsonNull) {
-                null
-            } else {
-                propertyJson.asJsonObject.toProperty()
-            }
-            NextPropertyResponse(
-                property = property,
-                remaining = payload.get("remaining")?.asInt ?: 0
-            )
-        }
+        val rows = executeJsonArrayRequest(
+            Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/rest/v1/rpc/scout_next")
+                .applySupabaseHeaders()
+                .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+        )
+        val first = rows.firstOrNull()?.asJsonObject
+        NextPropertyResponse(
+            property = first?.toProperty(),
+            remaining = first?.get("remaining")?.takeUnless { it.isJsonNull }?.asInt ?: 0
+        )
     }
 
     override suspend fun getProperties(
@@ -160,45 +147,42 @@ class SupabaseScannerService(
         page: Int,
         perPage: Int
     ): PropertiesResponse = withContext(Dispatchers.IO) {
-        val requiresClientPostFilter = filters.scouted != null || filters.listId != null
-        if (requiresClientPostFilter) {
-            val allProperties = fetchAllProperties(filters)
-            val scoutedApns = getScoutedApns()
-            val listApns = filters.listId?.let { getListApns(it).toSet() }
+        val listApns = filters.listId?.let { getListApns(it) }
+        if (listApns != null && listApns.isEmpty()) {
+            return@withContext PropertiesResponse(emptyList(), 0, page, perPage, 1)
+        }
 
-            val filtered = allProperties
-                .map { property ->
-                    property.copy(isScouted = property.apn in scoutedApns)
-                }
-                .filter { property ->
-                    val matchesScouted = when (filters.scouted) {
-                        true -> property.isScouted
-                        false -> !property.isScouted
-                        null -> true
-                    }
-                    val matchesList = listApns?.contains(property.apn) ?: true
-                    matchesScouted && matchesList
-                }
+        val safePerPage = perPage.coerceAtLeast(1)
+        val url = mapMarkersUrl().apply {
+            addQueryParameter("select", MAP_MARKER_COLUMNS)
+            applyPropertyFilters(filters)
+            listApns?.let { addQueryParameter("apn", "in.(${it.toPostgrestList()})") }
+            val sortColumn = SORT_COLUMNS[filters.sort] ?: "location"
+            val direction = if (filters.order.equals("desc", ignoreCase = true)) "desc" else "asc"
+            addQueryParameter("order", "$sortColumn.$direction.nullslast,apn.asc")
+            addQueryParameter("offset", (((page - 1).coerceAtLeast(0)) * safePerPage).toString())
+            addQueryParameter("limit", safePerPage.toString())
+        }.build()
 
-            val total = filtered.size
-            val safePerPage = perPage.coerceAtLeast(1)
-            val offset = ((page - 1).coerceAtLeast(0)) * safePerPage
-            val pagedProperties = filtered.drop(offset).take(safePerPage)
-
+        client.newCall(
+            Request.Builder()
+                .url(url)
+                .applySupabaseHeaders()
+                .addHeader("Prefer", "count=exact")
+                .get()
+                .build()
+        ).execute().use { response ->
+            response.requireSuccess()
+            val rawBody = response.body?.string().orEmpty()
+            val rows = if (rawBody.isBlank()) JsonArray() else JsonParser().parse(rawBody).asJsonArray
+            val properties = rows.map { it.asJsonObject.toProperty() }
+            val total = parseContentRangeTotal(response.header("Content-Range")) ?: properties.size
             PropertiesResponse(
-                properties = pagedProperties,
+                properties = properties,
                 total = total,
                 page = page,
                 perPage = perPage,
                 totalPages = ((total + safePerPage - 1) / safePerPage).coerceAtLeast(1)
-            )
-        } else {
-            val response = executePropertiesRpc(filters, page, perPage)
-            val scoutedApns = getScoutedApns(response.properties.map { it.apn })
-            response.copy(
-                properties = response.properties.map { property ->
-                    property.copy(isScouted = property.apn in scoutedApns)
-                }
             )
         }
     }
@@ -262,97 +246,20 @@ class SupabaseScannerService(
                 .build()
         )
 
-        val apnRows = executeJsonArrayRequest(
-            Request.Builder()
-                .url("${baseUrl.trimEnd('/')}/rest/v1/list_properties?select=apn,sort_order&list_id=eq.$listId&order=sort_order.asc")
-                .applySupabaseHeaders()
-                .get()
-                .build()
-        )
-
-        val apns = buildList {
-            for (index in 0 until apnRows.size()) {
-                add(apnRows.get(index).asJsonObject.get("apn").asString)
-            }
-        }
-
+        val apns = getListApns(listId)
         val properties = if (apns.isEmpty()) {
             emptyList()
         } else {
-            val inClause = apns.joinToString(",") { "\"$it\"" }
-            val propertyRows = executeJsonArrayRequest(
-                Request.Builder()
-                    .url("${baseUrl.trimEnd('/')}/rest/v1/bills?select=apn,location_of_property,city,has_vpt,condition_score,streetview_image_path,power_status,deceased_count&apn=in.($inClause)")
-                    .applySupabaseHeaders()
-                    .get()
-                    .build()
-            )
-            val parcelRows = executeJsonArrayRequest(
-                Request.Builder()
-                    .url("${baseUrl.trimEnd('/')}/rest/v1/parcels?select=APN,row_json&APN=in.($inClause)")
-                    .applySupabaseHeaders()
-                    .get()
-                    .build()
-            )
-            val scoutedApns = getScoutedApns(apns)
-
-            val billMap = mutableMapOf<String, JsonObject>()
-            for (index in 0 until propertyRows.size()) {
-                val row = propertyRows.get(index).asJsonObject
-                billMap[row.get("apn").asString] = row
-            }
-            val parcelMap = mutableMapOf<String, com.google.gson.JsonElement?>()
-            for (index in 0 until parcelRows.size()) {
-                val row = parcelRows.get(index).asJsonObject
-                parcelMap[row.get("APN").asString] = row.get("row_json")
-            }
-
-            apns.mapNotNull { apn ->
-                val bill = billMap[apn] ?: return@mapNotNull null
-                // Extract mailing address and last sale date from row_json
-                val rowJsonElement = parcelMap[apn]
-                var mailingAddress: String? = null
-                var lastSaleDate: String? = null
-                var isOutOfState = false
-                if (rowJsonElement != null && !rowJsonElement.isJsonNull) {
-                    val rowObj = when {
-                        rowJsonElement.isJsonObject -> rowJsonElement.asJsonObject
-                        rowJsonElement.isJsonPrimitive && rowJsonElement.asJsonPrimitive.isString -> {
-                            try { JsonParser().parse(rowJsonElement.asString).asJsonObject } catch (_: Exception) { null }
-                        }
-                        else -> null
-                    }
-                    if (rowObj != null) {
-                        mailingAddress = rowObj.get("MailingAddress")?.takeUnless { it.isJsonNull }?.asString
-                        lastSaleDate = rowObj.get("LatestDocumentDate")?.takeUnless { it.isJsonNull }?.asString
-                            ?.split(" ")?.firstOrNull()
-                        if (!mailingAddress.isNullOrBlank()) {
-                            val upper = mailingAddress.uppercase()
-                            isOutOfState = !upper.endsWith(" CA") && " CA " !in upper
-                        }
-                    }
-                }
-                val row = JsonObject().apply {
-                    addProperty("apn", apn)
-                    add("location_of_property", bill.get("location_of_property"))
-                    add("city", bill.get("city"))
-                    add("has_vpt", bill.get("has_vpt"))
-                    add("condition_score", bill.get("condition_score"))
-                    add("streetview_image_path", bill.get("streetview_image_path"))
-                    add("deceased_count", bill.get("deceased_count"))
-                    parcelMap[apn]?.let { add("row_json", it) }
-                }
-                val powerStatus = bill.get("power_status")?.takeUnless { it.isJsonNull }?.asString
-                val deceasedCount = bill.get("deceased_count")?.takeUnless { it.isJsonNull }?.asInt
-                row.toProperty().copy(
-                    isScouted = apn in scoutedApns,
-                    powerStatus = powerStatus,
-                    mailingAddress = mailingAddress,
-                    lastSaleDate = lastSaleDate,
-                    isOutOfState = isOutOfState,
-                    deceasedCount = deceasedCount
-                )
-            }
+            val url = mapMarkersUrl().apply {
+                addQueryParameter("select", MAP_MARKER_COLUMNS)
+                addQueryParameter("apn", "in.(${apns.toPostgrestList()})")
+            }.build()
+            val byApn = executeJsonArrayRequest(
+                Request.Builder().url(url).applySupabaseHeaders().get().build()
+            ).map { it.asJsonObject.toProperty() }.associateBy { it.apn }
+            // map_markers only holds rows with coordinates; keep list order and
+            // drop APNs the view does not return.
+            apns.mapNotNull { byApn[it] }
         }
 
         ListWithProperties(
@@ -522,165 +429,79 @@ class SupabaseScannerService(
         )
     }
 
-    private fun executePropertiesRpc(
-        filters: PropertyFilters,
-        page: Int,
-        perPage: Int
-    ): PropertiesResponse {
-        val body = JsonObject().apply {
-            addProperty("p_q", filters.query.orEmpty())
-            addProperty("p_zip", filters.zip.orEmpty())
-            addProperty("p_power", filters.power.orEmpty())
-            addProperty("p_fav", if (filters.favoritesOnly) 1 else -1)
-            addProperty("p_city", filters.city?.trim()?.uppercase().orEmpty())
-            addProperty("p_vpt", if (filters.vptOnly) 1 else -1)
-            addProperty("p_delinquent", if (filters.delinquentOnly) 1 else -1)
-            addProperty("p_condition", filters.condition.orEmpty())
-            addProperty("p_outofstate", if (filters.outOfStateOnly) 1 else -1)
-            addProperty("p_sort", filters.sort)
-            addProperty("p_order", filters.order)
-            addProperty("p_limit", perPage)
-            addProperty("p_offset", (page - 1) * perPage)
-            addProperty("p_research", filters.research.orEmpty())
-            addProperty("p_owner_name", filters.ownerName.orEmpty())
-        }
 
-        val request = Request.Builder()
-            .url("${baseUrl.trimEnd('/')}/rest/v1/rpc/get_bills_filtered")
-            .addHeader("apikey", anonKey)
-            .addHeader("Authorization", "Bearer ${accessTokenProvider().orEmpty()}")
-            .addHeader("Content-Type", "application/json")
-            .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
-            .build()
 
-        return client.newCall(request).execute().use { response ->
-            response.requireSuccess()
-            val rawBody = response.body?.string().orEmpty()
-            val payload = extractRpcPayload(rawBody, "get_bills_filtered")
-            val rows = payload.getAsJsonArray("rows") ?: JsonArray()
-            val properties = buildList {
-                for (index in 0 until rows.size()) {
-                    add(rows.get(index).asJsonObject.toProperty())
-                }
-            }
-            PropertiesResponse(
-                properties = properties,
-                total = payload.get("total")?.asInt ?: properties.size,
-                page = page,
-                perPage = perPage,
-                totalPages = if (perPage > 0) {
-                    val total = payload.get("total")?.asInt ?: properties.size
-                    ((total + perPage - 1) / perPage).coerceAtLeast(1)
-                } else {
-                    1
-                }
-            )
-        }
-    }
 
-    private fun extractRpcPayload(rawBody: String, rpcName: String): JsonObject {
-        if (rawBody.isBlank()) {
-            return JsonObject()
-        }
 
-        val parsed = JsonParser().parse(rawBody)
-        val candidate = when {
-            parsed.isJsonObject -> parsed.asJsonObject
-            parsed.isJsonArray -> {
-                val array = parsed.asJsonArray
-                if (array.size() == 0 || !array[0].isJsonObject) {
-                    return JsonObject()
-                }
-                array[0].asJsonObject
-            }
-            else -> return JsonObject()
-        }
 
-        val wrapped = candidate.get(rpcName)
-        return if (wrapped != null && wrapped.isJsonObject) {
-            wrapped.asJsonObject
-        } else {
-            candidate
-        }
-    }
 
-    private fun extractRpcArrayPayload(rawBody: String, rpcName: String): JsonArray {
-        if (rawBody.isBlank()) {
-            return JsonArray()
-        }
 
-        val parsed = JsonParser().parse(rawBody)
-        if (parsed.isJsonArray) {
-            val array = parsed.asJsonArray
-            if (array.size() == 1 && array[0].isJsonObject) {
-                val wrapped = array[0].asJsonObject.get(rpcName)
-                if (wrapped != null && wrapped.isJsonArray) {
-                    return wrapped.asJsonArray
-                }
-            }
-            return array
-        }
-        if (parsed.isJsonObject) {
-            val wrapped = parsed.asJsonObject.get(rpcName)
-            if (wrapped != null && wrapped.isJsonArray) {
-                return wrapped.asJsonArray
-            }
-        }
-        return JsonArray()
-    }
-
-    private fun fetchAllProperties(filters: PropertyFilters): List<Property> {
-        val collected = mutableListOf<Property>()
-        var page = 1
-        var totalPages: Int
-        do {
-            val response = executePropertiesRpc(
-                filters = filters.copy(scouted = null, listId = null),
-                page = page,
-                perPage = 200
-            )
-            collected += response.properties
-            totalPages = response.totalPages
-            page += 1
-        } while (page <= totalPages)
-        return collected
-    }
 
     private fun JsonObject.toProperty(): Property {
-        val hasVptElement = get("has_vpt")
-        val hasVpt = when {
-            hasVptElement == null || hasVptElement.isJsonNull -> false
-            hasVptElement.asJsonPrimitive.isBoolean -> hasVptElement.asBoolean
-            else -> hasVptElement.asInt == 1
+        fun string(vararg keys: String): String? = keys.firstNotNullOfOrNull { key ->
+            get(key)?.takeUnless { it.isJsonNull }?.asString?.takeIf { it.isNotBlank() }
         }
-        val derivedCoordinates = deriveCoordinates(get("row_json"))
-        val latitude = get("latitude")?.takeUnless { it.isJsonNull }?.asDouble ?: derivedCoordinates?.first
-        val longitude = get("longitude")?.takeUnless { it.isJsonNull }?.asDouble ?: derivedCoordinates?.second
-        val locationOfProperty = get("location_of_property")?.takeUnless { it.isJsonNull }?.asString
-        val address = get("address")?.takeUnless { it.isJsonNull }?.asString
-        val city = get("city")?.takeUnless { it.isJsonNull }?.asString
-        val streetviewImagePath = get("streetview_image_path")?.takeUnless { it.isJsonNull }?.asString
-        val deceasedCount = get("deceased_count")?.takeUnless { it.isJsonNull }?.asInt
+        fun double(vararg keys: String): Double? = keys.firstNotNullOfOrNull { key ->
+            get(key)?.takeUnless { it.isJsonNull }?.asDouble
+        }
+        fun flag(key: String): Boolean {
+            val element = get(key)?.takeUnless { it.isJsonNull } ?: return false
+            val primitive = element.asJsonPrimitive
+            return if (primitive.isBoolean) primitive.asBoolean else primitive.asInt == 1
+        }
 
         return Property(
             apn = get("apn")?.asString.orEmpty(),
-            address = (
-                locationOfProperty
-                    ?: address
-                )?.takeIf { it.isNotBlank() },
-            city = city?.takeIf { it.isNotBlank() },
-            latitude = latitude,
-            longitude = longitude,
-            hasVpt = hasVpt,
-            conditionScore = if (has("condition_score") && !get("condition_score").isJsonNull) {
-                get("condition_score").asFloat
-            } else {
-                null
-            },
-            isScouted = false,
-            streetviewImagePath = streetviewImagePath?.takeIf { it.isNotBlank() },
-            deceasedCount = deceasedCount
+            address = string("location", "location_of_property", "address"),
+            city = string("city"),
+            latitude = double("lat", "latitude"),
+            longitude = double("lng", "longitude"),
+            hasVpt = flag("has_vpt"),
+            conditionScore = get("condition_score")?.takeUnless { it.isJsonNull }?.asFloat,
+            isScouted = flag("is_scouted"),
+            streetviewImagePath = string("streetview_image_path"),
+            powerStatus = string("power_status"),
+            mailingAddress = string("mailing_address"),
+            lastSaleDate = string("last_sale_date"),
+            isOutOfState = flag("is_out_of_state"),
+            deceasedCount = get("deceased_count")?.takeUnless { it.isJsonNull }?.asInt,
+            isDelinquent = flag("delinquent"),
+            zipCode = string("situs_zip", "zip_code"),
+            taxYear = string("tax_year"),
+            lastPayment = string("last_payment"),
+            ownerName = string("owner_name"),
+            researchStatus = string("research_status")
         )
+    }
+
+    private fun mapMarkersUrl(): HttpUrl.Builder =
+        "${baseUrl.trimEnd('/')}/rest/v1/map_markers".toHttpUrl().newBuilder()
+
+    /** Mirrors get_bills_with_parcels_filtered in scan/db.py so web and phone agree. */
+    private fun HttpUrl.Builder.applyPropertyFilters(filters: PropertyFilters) {
+        filters.query?.toPostgrestSearchTerm()?.let { term ->
+            addQueryParameter("or", "(apn.ilike.*$term*,location.ilike.*$term*)")
+        }
+        filters.city?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }?.let {
+            addQueryParameter("city", "eq.$it")
+        }
+        filters.zip?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }?.let {
+            addQueryParameter("situs_zip", "in.(${it.toPostgrestList()})")
+        }
+        filters.power?.trim()?.takeIf { it.isNotEmpty() }?.let { addQueryParameter("power_status", "eq.$it") }
+        filters.research?.trim()?.takeIf { it.isNotEmpty() }?.let { addQueryParameter("research_status", "eq.$it") }
+        filters.ownerName?.toPostgrestSearchTerm()?.let { addQueryParameter("owner_name", "ilike.*$it*") }
+        if (filters.vptOnly) addQueryParameter("has_vpt", "eq.1")
+        if (filters.delinquentOnly) addQueryParameter("delinquent", "eq.1")
+        if (filters.favoritesOnly) addQueryParameter("is_favorite", "is.true")
+        if (filters.outOfStateOnly) addQueryParameter("is_out_of_state", "is.true")
+        filters.scouted?.let { addQueryParameter("is_scouted", "is.$it") }
+        when (filters.condition?.trim()?.lowercase()) {
+            "good" -> addQueryParameter("condition_score", "gte.7")
+            "fair" -> addQueryParameter("and", "(condition_score.gte.4,condition_score.lt.7)")
+            "poor" -> addQueryParameter("condition_score", "lt.4")
+            "unscored" -> addQueryParameter("condition_score", "is.null")
+        }
     }
 
     private fun getListApns(listId: Long): List<String> {
@@ -698,31 +519,7 @@ class SupabaseScannerService(
         }
     }
 
-    private fun getScoutedApns(apns: Collection<String>? = null): Set<String> {
-        if (apns != null && apns.isEmpty()) {
-            return emptySet()
-        }
 
-        val url = buildString {
-            append("${baseUrl.trimEnd('/')}/rest/v1/scout_results?select=apn")
-            if (apns != null) {
-                val inClause = apns.joinToString(",") { "\"$it\"" }
-                append("&apn=in.($inClause)")
-            }
-        }
-        val rows = executeJsonArrayRequest(
-            Request.Builder()
-                .url(url)
-                .applySupabaseHeaders()
-                .get()
-                .build()
-        )
-        return buildSet {
-            for (index in 0 until rows.size()) {
-                add(rows.get(index).asJsonObject.get("apn").asString)
-            }
-        }
-    }
 
     private fun getListPropertyCount(listId: Long): Int {
         return executeJsonArrayRequest(
@@ -734,28 +531,7 @@ class SupabaseScannerService(
         ).size()
     }
 
-    private fun deriveCoordinates(rowJsonElement: com.google.gson.JsonElement?): Pair<Double, Double>? {
-        if (rowJsonElement == null || rowJsonElement.isJsonNull) {
-            return null
-        }
-        val rowObject = when {
-            rowJsonElement.isJsonObject -> rowJsonElement.asJsonObject
-            rowJsonElement.isJsonPrimitive && rowJsonElement.asJsonPrimitive.isString -> {
-                JsonParser().parse(rowJsonElement.asString).asJsonObject
-            }
-            else -> return null
-        }
 
-        val x = rowObject.get("CENTROID_X")?.takeUnless { it.isJsonNull }?.asDouble ?: return null
-        val y = rowObject.get("CENTROID_Y")?.takeUnless { it.isJsonNull }?.asDouble ?: return null
-        if (x == 0.0 || y == 0.0) {
-            return null
-        }
-        val lng = (x / 20037508.34) * 180
-        var lat = (y / 20037508.34) * 180
-        lat = 180 / Math.PI * (2 * kotlin.math.atan(kotlin.math.exp(lat * Math.PI / 180)) - Math.PI / 2)
-        return lat to lng
-    }
 
     private fun executeJsonObjectRequest(request: Request): JsonObject {
         return client.newCall(request).execute().use { response ->
@@ -844,3 +620,15 @@ private fun String.encodeUrlComponent(): String = URLEncoder.encode(this, Charse
 private fun String.encodeRoutePath(): String =
     split("/")
         .joinToString("/") { it.encodeUrlComponent() }
+
+/** Total from a PostgREST Content-Range header, e.g. "0-24/519" gives 519. */
+internal fun parseContentRangeTotal(header: String?): Int? =
+    header?.substringAfterLast('/', "")?.toIntOrNull()
+
+/** Quote each value for a PostgREST in.(...) list. */
+private fun Collection<String>.toPostgrestList(): String =
+    joinToString(",") { "\"" + it.replace("\"", "") + "\"" }
+
+/** Strip characters that would break PostgREST or/ilike syntax. */
+private fun String.toPostgrestSearchTerm(): String? =
+    replace(Regex("[,()*\"\\\\]"), " ").trim().takeIf { it.isNotEmpty() }

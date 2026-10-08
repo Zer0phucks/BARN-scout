@@ -32,147 +32,179 @@ class SupabaseScannerServiceTest {
         server.shutdown()
     }
 
+    private fun service() = SupabaseScannerService(
+        baseUrl = server.url("/").toString(),
+        anonKey = "anon-key",
+        accessTokenProvider = { "jwt-token" },
+        authManager = null
+    )
+
     @Test
-    fun `getProperties posts scanner filters to get_bills_filtered rpc`() = runBlocking {
-        server.enqueueJson("""{"rows":[],"total":0}""")
-        server.enqueueJson("""[]""")
+    fun `getProperties reads map_markers with auth headers and exact count`() = runBlocking {
+        server.enqueueJson("""[]""", contentRange = "*/0")
 
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
-
-        val response = service.getProperties(
-            filters = PropertyFilters(
-                city = "OAKLAND",
-                query = "elm",
-                vptOnly = true
-            ),
+        val response = service().getProperties(
+            filters = PropertyFilters(city = "oakland", query = "elm", vptOnly = true),
             page = 1,
             perPage = 50
         )
 
         val request = server.takeRequest()
-        assertEquals("/rest/v1/rpc/get_bills_filtered", request.path)
+        val url = request.requestUrl!!
+        assertEquals("/rest/v1/map_markers", url.encodedPath)
         assertEquals("Bearer jwt-token", request.getHeader("Authorization"))
         assertEquals("anon-key", request.getHeader("apikey"))
-        assertTrue(request.body.readUtf8().contains("\"p_city\":\"OAKLAND\""))
+        assertEquals("count=exact", request.getHeader("Prefer"))
+        assertEquals("eq.OAKLAND", url.queryParameter("city"))
+        assertEquals("(apn.ilike.*elm*,location.ilike.*elm*)", url.queryParameter("or"))
+        assertEquals("eq.1", url.queryParameter("has_vpt"))
         assertEquals(0, response.total)
         assertTrue(response.properties.isEmpty())
     }
 
     @Test
-    fun `getProperties posts the full shared filter contract to get_bills_filtered rpc`() = runBlocking {
-        server.enqueueJson("""{"rows":[],"total":0}""")
-        server.enqueueJson("""[]""")
+    fun `getProperties maps the full filter contract onto postgrest params`() = runBlocking {
+        server.enqueueJson("""[]""", contentRange = "*/0")
 
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
-
-        service.getProperties(
+        service().getProperties(
             filters = PropertyFilters(
                 city = "Oakland",
                 query = "elm",
-                zip = "94601,94602",
+                zip = "94601, 94602",
                 power = "off",
                 favoritesOnly = true,
                 vptOnly = true,
                 delinquentOnly = true,
-                condition = "poor",
+                condition = "fair",
                 outOfStateOnly = true,
                 research = "complete",
                 ownerName = "smith",
                 sort = "condition_score",
-                order = "desc"
+                order = "desc",
+                scouted = false
             ),
             page = 3,
             perPage = 25
         )
 
-        val body = server.takeRequest().body.readUtf8()
-        assertTrue(body.contains("\"p_q\":\"elm\""))
-        assertTrue(body.contains("\"p_zip\":\"94601,94602\""))
-        assertTrue(body.contains("\"p_power\":\"off\""))
-        assertTrue(body.contains("\"p_fav\":1"))
-        assertTrue(body.contains("\"p_city\":\"OAKLAND\""))
-        assertTrue(body.contains("\"p_vpt\":1"))
-        assertTrue(body.contains("\"p_delinquent\":1"))
-        assertTrue(body.contains("\"p_condition\":\"poor\""))
-        assertTrue(body.contains("\"p_outofstate\":1"))
-        assertTrue(body.contains("\"p_research\":\"complete\""))
-        assertTrue(body.contains("\"p_owner_name\":\"smith\""))
-        assertTrue(body.contains("\"p_sort\":\"condition_score\""))
-        assertTrue(body.contains("\"p_order\":\"desc\""))
-        assertTrue(body.contains("\"p_limit\":25"))
-        assertTrue(body.contains("\"p_offset\":50"))
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("in.(\"94601\",\"94602\")", url.queryParameter("situs_zip"))
+        assertEquals("eq.off", url.queryParameter("power_status"))
+        assertEquals("is.true", url.queryParameter("is_favorite"))
+        assertEquals("eq.1", url.queryParameter("delinquent"))
+        assertEquals("(condition_score.gte.4,condition_score.lt.7)", url.queryParameter("and"))
+        assertEquals("is.true", url.queryParameter("is_out_of_state"))
+        assertEquals("eq.complete", url.queryParameter("research_status"))
+        assertEquals("ilike.*smith*", url.queryParameter("owner_name"))
+        assertEquals("is.false", url.queryParameter("is_scouted"))
+        assertEquals("condition_score.desc.nullslast,apn.asc", url.queryParameter("order"))
+        assertEquals("50", url.queryParameter("offset"))
+        assertEquals("25", url.queryParameter("limit"))
     }
 
     @Test
-    fun `getMapPropertiesInBounds uses map rpc row json coordinates and filters to viewport`() = runBlocking {
+    fun `getProperties strips postgrest syntax characters from search terms`() = runBlocking {
+        server.enqueueJson("""[]""", contentRange = "*/0")
+
+        service().getProperties(PropertyFilters(query = "elm, (st)*"), page = 1, perPage = 10)
+
+        val or = server.takeRequest().requestUrl!!.queryParameter("or")!!
+        assertTrue(or, or.startsWith("(apn.ilike.*elm") && !or.contains("(st)"))
+    }
+
+    @Test
+    fun `getProperties parses view rows and content-range total`() = runBlocking {
         server.enqueueJson(
             """
             [
               {
-                "apn": "inside",
-                "location_of_property": "101 First St",
-                "city": "OAKLAND",
+                "apn": "63-2969-19",
+                "location": "1002 GRIZZLY PEAK BLVD, BERKELEY",
+                "city": "BERKELEY",
+                "situs_zip": null,
+                "zip_code": "94708",
+                "lat": 37.88,
+                "lng": -122.24,
                 "has_vpt": 1,
-                "row_json": {
-                  "CENTROID_X": "-13603237.85",
-                  "CENTROID_Y": "4547675.35"
-                }
-              },
-              {
-                "apn": "outside",
-                "location_of_property": "999 Far St",
-                "city": "OAKLAND",
-                "has_vpt": 1,
-                "row_json": {
-                  "CENTROID_X": "-13500000.00",
-                  "CENTROID_Y": "4547675.35"
-                }
+                "delinquent": 0,
+                "power_status": "off",
+                "condition_score": 4.0,
+                "streetview_image_path": null,
+                "research_status": "failed",
+                "owner_name": null,
+                "last_payment": "Dec 8, 2025",
+                "tax_year": "2025-2026",
+                "is_out_of_state": false,
+                "is_favorite": false,
+                "is_scouted": true
               }
             ]
-            """.trimIndent()
+            """.trimIndent(),
+            contentRange = "0-0/519"
         )
 
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
+        val response = service().getProperties(PropertyFilters(), page = 1, perPage = 25)
 
-        val properties = service.getMapPropertiesInBounds(
+        assertEquals(519, response.total)
+        assertEquals(21, response.totalPages)
+        val property = response.properties.single()
+        assertEquals("1002 GRIZZLY PEAK BLVD, BERKELEY", property.address)
+        assertEquals(37.88, property.latitude!!, 0.0)
+        assertEquals(-122.24, property.longitude!!, 0.0)
+        assertTrue(property.hasVpt)
+        assertTrue(property.isScouted)
+        assertEquals("94708", property.zipCode)
+        assertEquals("Dec 8, 2025", property.lastPayment)
+        assertEquals("failed", property.researchStatus)
+    }
+
+    @Test
+    fun `getProperties restricts to list apns server side`() = runBlocking {
+        server.enqueueJson("""[{"apn":"002-002"},{"apn":"001-001"}]""")
+        server.enqueueJson("""[]""", contentRange = "*/0")
+
+        service().getProperties(PropertyFilters(listId = 7L), page = 1, perPage = 50)
+
+        assertEquals("/rest/v1/list_properties", server.takeRequest().requestUrl!!.encodedPath)
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("/rest/v1/map_markers", url.encodedPath)
+        assertEquals("in.(\"002-002\",\"001-001\")", url.queryParameter("apn"))
+    }
+
+    @Test
+    fun `getProperties returns empty without querying markers for an empty list`() = runBlocking {
+        server.enqueueJson("""[]""")
+
+        val response = service().getProperties(PropertyFilters(listId = 7L), page = 1, perPage = 50)
+
+        assertEquals(0, response.total)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `getMapPropertiesInBounds filters the viewport server side`() = runBlocking {
+        server.enqueueJson("""[{"apn":"inside","location":"101 First St","city":"OAKLAND","lat":37.8,"lng":-122.2,"has_vpt":1}]""")
+
+        val properties = service().getMapPropertiesInBounds(
             south = 37.7,
             west = -122.3,
             north = 37.9,
             east = -122.1
         )
 
-        val request = server.takeRequest()
-        assertEquals("/rest/v1/rpc/get_bills_for_map", request.path)
+        val url = server.takeRequest().requestUrl!!
+        assertEquals("/rest/v1/map_markers", url.encodedPath)
+        assertEquals(listOf("gte.37.7", "lte.37.9"), url.queryParameterValues("lat"))
+        assertEquals(listOf("gte.-122.3", "lte.-122.1"), url.queryParameterValues("lng"))
         assertEquals(listOf("inside"), properties.map { it.apn })
-        assertTrue(properties.single().latitude != null)
-        assertTrue(properties.single().longitude != null)
+        assertEquals(37.8, properties.single().latitude!!, 0.0)
     }
 
     @Test
     fun `addPropertiesToList appends through route queue rpc`() = runBlocking {
         server.enqueueJson("""{"added":2}""")
 
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
+        val service = service()
 
         service.addPropertiesToList(7L, AddPropertiesRequest(listOf("002", "003")))
 
@@ -188,12 +220,7 @@ class SupabaseScannerServiceTest {
     fun `reorderListProperties posts ordered apns to route queue rpc`() = runBlocking {
         server.enqueueJson("""{"updated":3}""")
 
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
+        val service = service()
 
         service.reorderListProperties(7L, listOf("003", "001", "002"))
 
@@ -206,287 +233,79 @@ class SupabaseScannerServiceTest {
     }
 
     @Test
-    fun `getNextProperty posts location filters to the next scoutable property rpc`() = runBlocking {
+    fun `getNextProperty calls scout_next and reads remaining from the row`() = runBlocking {
         server.enqueueJson(
             """
-            {
-              "property": {
+            [
+              {
                 "apn": "001-100-100",
                 "address": "123 Test St",
                 "city": "OAKLAND",
                 "latitude": 37.8,
                 "longitude": -122.2,
-                "has_vpt": true,
+                "has_vpt": 1,
                 "condition_score": 5.5,
-                "streetview_image_path": "streetview/test.jpg"
-              },
-              "remaining": 4
-            }
+                "streetview_image_path": "https://example.com/1.jpg",
+                "distance_km": 0.4,
+                "remaining": 4
+              }
+            ]
             """.trimIndent()
         )
 
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
-
-        val response = service.getNextProperty(
+        val response = service().getNextProperty(
             latitude = 37.8,
             longitude = -122.2,
-            city = "OAKLAND",
+            city = "oakland",
             vptOnly = true,
             listId = 7L
         )
 
         val request = server.takeRequest()
-        assertEquals("/rest/v1/rpc/android_get_next_scoutable_property", request.path)
-        assertTrue(request.body.readUtf8().contains("\"p_lat\":37.8"))
+        assertEquals("/rest/v1/rpc/scout_next", request.path)
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("\"p_lat\":37.8"))
+        assertTrue(body.contains("\"p_city\":\"OAKLAND\""))
+        assertTrue(body.contains("\"p_vpt_only\":true"))
+        assertTrue(body.contains("\"p_list_id\":7"))
         assertEquals("001-100-100", response.property?.apn)
+        assertTrue(response.property!!.hasVpt)
         assertEquals(4, response.remaining)
     }
 
     @Test
-    fun `getProperties derives map coordinates from row_json`() = runBlocking {
-        server.enqueueJson(
-            """
-            {
-              "rows": [
-                {
-                  "apn": "001-100-100",
-                  "location_of_property": "123 Test St",
-                  "city": "OAKLAND",
-                  "has_vpt": 1,
-                  "condition_score": 4.0,
-                  "row_json": {
-                    "CENTROID_X": "-13603237.85",
-                    "CENTROID_Y": "4547675.35"
-                  }
-                }
-              ],
-              "total": 1
-            }
-            """.trimIndent()
-        )
+    fun `getNextProperty returns no property when scout_next is empty`() = runBlocking {
         server.enqueueJson("""[]""")
 
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
+        val response = service().getNextProperty(latitude = 37.8, longitude = -122.2)
 
-        val response = service.getProperties(
-            filters = PropertyFilters(city = "OAKLAND"),
-            page = 1,
-            perPage = 50
-        )
-
-        assertEquals(1, response.properties.size)
-        assertTrue(response.properties.first().latitude != null)
-        assertTrue(response.properties.first().longitude != null)
+        assertEquals(null, response.property)
+        assertEquals(0, response.remaining)
     }
 
     @Test
-    fun `getProperties tolerates explicit json nulls in property rows`() = runBlocking {
-        server.enqueueJson(
-            """
-            {
-              "rows": [
-                {
-                  "apn": "001-100-100",
-                  "location_of_property": null,
-                  "address": "123 Test St",
-                  "city": null,
-                  "has_vpt": 1,
-                  "condition_score": null,
-                  "streetview_image_path": null,
-                  "row_json": null
-                }
-              ],
-              "total": 1
-            }
-            """.trimIndent()
-        )
-        server.enqueueJson("""[]""")
-
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
-
-        val response = service.getProperties(
-            filters = PropertyFilters(city = "OAKLAND"),
-            page = 1,
-            perPage = 50
-        )
-
-        assertEquals(1, response.total)
-        assertEquals("001-100-100", response.properties.single().apn)
-        assertEquals("123 Test St", response.properties.single().address)
-        assertEquals(null, response.properties.single().city)
-    }
-
-    @Test
-    fun `getProperties parses wrapped postgrest rpc payload`() = runBlocking {
-        server.enqueueJson(
-            """
-            [
-              {
-                "get_bills_filtered": {
-                  "rows": [
-                    {
-                      "apn": "001-100-100",
-                      "location_of_property": "123 Test St",
-                      "city": "OAKLAND",
-                      "has_vpt": 1
-                    }
-                  ],
-                  "total": 1
-                }
-              }
-            ]
-            """.trimIndent()
-        )
-        server.enqueueJson("""[]""")
-
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
-
-        val response = service.getProperties(
-            filters = PropertyFilters(city = "OAKLAND"),
-            page = 1,
-            perPage = 50
-        )
-
-        assertEquals(1, response.total)
-        assertEquals("001-100-100", response.properties.single().apn)
-    }
-
-    @Test
-    fun `getProperties sends -1 for p_vpt when not filtering to vpt only`() = runBlocking {
-        server.enqueueJson("""{"rows":[],"total":0}""")
-        server.enqueueJson("""[]""")
-
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
-
-        service.getProperties(
-            filters = PropertyFilters(city = "OAKLAND", vptOnly = false),
-            page = 1,
-            perPage = 50
-        )
-
-        val request = server.takeRequest()
-        assertTrue(request.body.readUtf8().contains("\"p_vpt\":-1"))
-    }
-
-    @Test
-    fun `getProperties sends no-filter sentinel values for optional integer filters`() = runBlocking {
-        server.enqueueJson("""{"rows":[],"total":0}""")
-        server.enqueueJson("""[]""")
-
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
-
-        service.getProperties(
-            filters = PropertyFilters(city = "OAKLAND", vptOnly = false),
-            page = 1,
-            perPage = 50
-        )
-
-        val requestBody = server.takeRequest().body.readUtf8()
-        assertTrue(requestBody.contains("\"p_fav\":-1"))
-        assertTrue(requestBody.contains("\"p_delinquent\":-1"))
-        assertTrue(requestBody.contains("\"p_outofstate\":-1"))
-    }
-
-    @Test
-    fun `getProperties applies list and unscouted filters client side`() = runBlocking {
-        server.enqueueJson(
-            """
-            {
-              "rows": [
-                {"apn": "001-001", "location_of_property": "101 First St", "city": "OAKLAND", "has_vpt": 1},
-                {"apn": "002-002", "location_of_property": "202 Second St", "city": "OAKLAND", "has_vpt": 0}
-              ],
-              "total": 2
-            }
-            """.trimIndent()
-        )
-        server.enqueueJson("""[{"apn":"001-001"}]""")
-        server.enqueueJson("""[{"apn":"001-001"},{"apn":"002-002"}]""")
-
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
-
-        val response = service.getProperties(
-            filters = PropertyFilters(city = "OAKLAND", scouted = false, listId = 7L),
-            page = 1,
-            perPage = 50
-        )
-
-        assertEquals(1, response.total)
-        assertEquals(listOf("002-002"), response.properties.map { it.apn })
-        assertTrue(!response.properties.first().isScouted)
-    }
-
-    @Test
-    fun `getList hydrates parcel coordinates and scout state in list order`() = runBlocking {
+    fun `getList hydrates properties from map_markers in list order`() = runBlocking {
         server.enqueueJson("""[{"id":7,"name":"East Bay","description":"targets","created_at":"2026-04-05T00:00:00Z"}]""")
-        server.enqueueJson("""[{"apn":"002-002","sort_order":1},{"apn":"001-001","sort_order":2}]""")
+        server.enqueueJson("""[{"apn":"002-002"},{"apn":"001-001"},{"apn":"no-coords"}]""")
         server.enqueueJson(
             """
             [
-              {"apn":"001-001","location_of_property":"101 First St","city":"OAKLAND","has_vpt":1,"condition_score":4.5,"streetview_image_path":"streetview/1.jpg"},
-              {"apn":"002-002","location_of_property":"202 Second St","city":"OAKLAND","has_vpt":0,"condition_score":6.0,"streetview_image_path":"streetview/2.jpg"}
+              {"apn":"001-001","location":"101 First St","city":"OAKLAND","lat":37.80,"lng":-122.20,"has_vpt":1,"is_scouted":false},
+              {"apn":"002-002","location":"202 Second St","city":"OAKLAND","lat":37.81,"lng":-122.21,"has_vpt":0,"is_scouted":true}
             ]
             """.trimIndent()
         )
-        server.enqueueJson(
-            """
-            [
-              {"APN":"001-001","row_json":{"CENTROID_X":"-13603237.85","CENTROID_Y":"4547675.35"}},
-              {"APN":"002-002","row_json":{"CENTROID_X":"-13603200.00","CENTROID_Y":"4547600.00"}}
-            ]
-            """.trimIndent()
-        )
-        server.enqueueJson("""[{"apn":"002-002"}]""")
 
-        val service = SupabaseScannerService(
-            baseUrl = server.url("/").toString(),
-            anonKey = "anon-key",
-            accessTokenProvider = { "jwt-token" },
-            authManager = null
-        )
+        val list = service().getList(7L)
 
-        val list = service.getList(7L)
-
+        server.takeRequest()
+        server.takeRequest()
+        val markers = server.takeRequest().requestUrl!!
+        assertEquals("/rest/v1/map_markers", markers.encodedPath)
         assertEquals(listOf("002-002", "001-001"), list.properties.map { it.apn })
-        assertTrue(list.properties.first().latitude != null)
-        assertTrue(list.properties.first().longitude != null)
         assertTrue(list.properties.first().isScouted)
         assertTrue(!list.properties.last().isScouted)
+        assertTrue(list.properties.all { it.latitude != null })
     }
 
     @Test
@@ -495,10 +314,7 @@ class SupabaseScannerServiceTest {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 requestThreads += Thread.currentThread().name
-                val body = when (chain.request().url.encodedPath) {
-                    "/rest/v1/rpc/get_bills_filtered" -> """{"rows":[],"total":0}"""
-                    else -> "[]"
-                }
+                val body = "[]"
                 Response.Builder()
                     .request(chain.request())
                     .protocol(Protocol.HTTP_1_1)
@@ -533,11 +349,12 @@ class SupabaseScannerServiceTest {
         assertTrue(requestThreads.none { it.contains("caller-thread") })
     }
 
-    private fun MockWebServer.enqueueJson(body: String) {
+    private fun MockWebServer.enqueueJson(body: String, contentRange: String? = null) {
         enqueue(
             MockResponse()
                 .setResponseCode(200)
                 .addHeader("Content-Type", "application/json")
+                .apply { contentRange?.let { addHeader("Content-Range", it) } }
                 .setBody(body)
         )
     }

@@ -2,10 +2,8 @@ package com.vpt.scout.ui.screens
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
-import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -27,7 +25,9 @@ import com.google.maps.android.compose.*
 import com.vpt.scout.ListRepository
 import com.vpt.scout.PropertyList
 import com.vpt.scout.PropertyRepository
+import com.vpt.scout.Property
 import com.vpt.scout.data.local.PropertyEntity
+import com.vpt.scout.ui.components.PropertyDetailSheet
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.collectLatest
@@ -332,115 +332,22 @@ fun MapScreen(
                 )
             }
             
-            // Property info sheet at bottom
-            selectedProperty?.let { property ->
-                // Calculate distance for selected property
-                val selectedDistance = userLocation?.let { loc ->
-                    calculateDistanceMiles(loc.latitude, loc.longitude, property.latitude, property.longitude)
+            // Tapping a marker opens the shared details sheet with directions.
+            selectedProperty?.let { entity ->
+                val distance = userLocation?.let { loc ->
+                    calculateDistanceMiles(loc.latitude, loc.longitude, entity.latitude, entity.longitude)
                 }
-                val distanceText = selectedDistance?.let { dist ->
-                    if (dist < 0.1) "${(dist * 5280).toInt()} ft away" else "%.2f mi away".format(dist)
-                } ?: ""
-                
-                // Find the rank of this property
-                val rank = sortedProperties.indexOfFirst { it.first.apn == property.apn } + 1
-                
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                // Distance badge
-                                if (distanceText.isNotEmpty()) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(bottom = 4.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.NearMe,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = distanceText,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        if (rank > 0 && rank <= 5) {
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Badge(
-                                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                                            ) {
-                                                Text("#$rank closest")
-                                            }
-                                        }
-                                    }
-                                }
-                                Text(
-                                    text = property.address,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Text(
-                                    text = "APN: ${property.apn}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                property.city?.let { 
-                                    Text(
-                                        text = it,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            IconButton(onClick = { selectedProperty = null }) {
-                                Icon(Icons.Default.Close, contentDescription = "Close")
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            FilledTonalButton(
-                                onClick = { 
-                                    val uri = Uri.parse("google.navigation:q=${property.latitude},${property.longitude}")
-                                    val intent = Intent(Intent.ACTION_VIEW, uri)
-                                    intent.setPackage("com.google.android.apps.maps")
-                                    context.startActivity(intent)
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Navigation, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Navigate")
-                            }
-                            
-                            FilledTonalButton(
-                                onClick = { showListDialog = true },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Add to List")
-                            }
-                        }
-                    }
+                val rank = sortedProperties.indexOfFirst { it.first.apn == entity.apn } + 1
+                val distanceText = distance?.let { dist ->
+                    val base = if (dist < 0.1) "${(dist * 5280).toInt()} ft away" else "%.2f mi away".format(dist)
+                    if (rank in 1..5) "$base · #$rank closest" else base
                 }
+                PropertyDetailSheet(
+                    property = entity.toProperty(),
+                    distanceText = distanceText,
+                    onDismiss = { selectedProperty = null },
+                    onAddToList = { showListDialog = true }
+                )
             }
             
             // Info cards at top
@@ -603,3 +510,14 @@ fun AddToListDialog(
         }
     )
 }
+
+private fun PropertyEntity.toProperty() = Property(
+    apn = apn,
+    address = address,
+    city = city,
+    latitude = latitude,
+    longitude = longitude,
+    hasVpt = hasVpt,
+    conditionScore = conditionScore,
+    streetviewImagePath = streetViewImagePath
+)

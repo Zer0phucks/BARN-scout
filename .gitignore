@@ -1,0 +1,14 @@
+# Gradle / build output
+.gradle/
+build/
+app/build/
+
+# IDE
+.idea/
+app/.idea/
+*.iml
+
+# Local config and secrets (see local.defaults.properties for the keys)
+local.properties
+.kotlin/
+captures/

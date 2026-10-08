@@ -98,9 +98,10 @@ internal fun areInitialProximityPermissionsGranted(
 }
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Explore : Screen("explore", "Explore", Icons.Default.Search)
-    object Route : Screen("route", "Route", Icons.Default.Route)
+    object Properties : Screen("list", "List", Icons.Default.ViewList)
     object Map : Screen("map", "Map", Icons.Default.Map)
+    object Gallery : Screen("gallery", "Gallery", Icons.Default.PhotoLibrary)
+    object Route : Screen("route", "Route", Icons.Default.Route)
     object Stats : Screen("stats", "Stats", Icons.Default.BarChart)
 }
 
@@ -152,7 +153,9 @@ fun ScoutApp(
         }
     }
     
-    val bottomNavScreens = listOf(Screen.Explore, Screen.Route, Screen.Map, Screen.Stats)
+    val bottomNavScreens = listOf(Screen.Properties, Screen.Map, Screen.Gallery, Screen.Route, Screen.Stats)
+    // Shared so the List and Gallery tabs show the same search results.
+    val exploreFilters = remember { ExploreFilters() }
     // Show bottom bar for main tabs only (not for detail screens)
     val showBottomBar = currentRoute in bottomNavScreens.map { it.route }
     
@@ -180,26 +183,25 @@ fun ScoutApp(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Explore.route,
+            startDestination = Screen.Properties.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Explore.route) {
-                PropertiesScreen(
-                    propertyRepository = container.propertyRepository,
-                    listRepository = container.listRepository,
-                    proximityAlertPreferences = container.proximityAlertPreferences,
-                    requestProximityPermissions = requestProximityPermissions,
-                    onNavigateToScout = { city, vptOnly, listId ->
-                        // Build route with optional args
-                        val route = buildString {
-                            append("scout")
-                            append("?city=${city ?: ""}")
-                            append("&vpt=${if (vptOnly) "1" else "0"}")
-                            append("&listId=${listId ?: ""}")
+            listOf(Screen.Properties to ExploreMode.LIST, Screen.Gallery to ExploreMode.GALLERY).forEach { (screen, mode) ->
+                composable(screen.route) {
+                    PropertiesScreen(
+                        mode = mode,
+                        filters = exploreFilters,
+                        propertyRepository = container.propertyRepository,
+                        listRepository = container.listRepository,
+                        proximityAlertPreferences = container.proximityAlertPreferences,
+                        requestProximityPermissions = requestProximityPermissions,
+                        onNavigateToScout = { city, vptOnly, listId ->
+                            navController.navigate(
+                                "scout?city=${city ?: ""}&vpt=${if (vptOnly) "1" else "0"}&listId=${listId ?: ""}"
+                            )
                         }
-                        navController.navigate(route)
-                    }
-                )
+                    )
+                }
             }
             
             composable(Screen.Route.route) {
@@ -294,8 +296,6 @@ fun ScoutApp(
                 )
             }
             
-// LIST ITEMS REMOVED
-
         }
     }
 }

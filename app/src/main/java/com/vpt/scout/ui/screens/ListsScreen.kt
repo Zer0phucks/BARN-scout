@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vpt.scout.ListRepository
+import com.vpt.scout.ui.openDirections
 import com.vpt.scout.ListWithProperties
 import com.vpt.scout.ListsState
 import com.vpt.scout.Property
@@ -426,16 +427,7 @@ fun ListDetailScreen(
                                     refreshList()
                                 }
                             },
-                            onNavigate = {
-                                property.latitude?.let { lat ->
-                                    property.longitude?.let { lng ->
-                                        val uri = Uri.parse("google.navigation:q=$lat,$lng")
-                                        val intent = Intent(Intent.ACTION_VIEW, uri)
-                                        intent.setPackage("com.google.android.apps.maps")
-                                        context.startActivity(intent)
-                                    }
-                                }
-                            }
+                            onNavigate = { openDirections(context, property) }
                         )
                     }
                 }

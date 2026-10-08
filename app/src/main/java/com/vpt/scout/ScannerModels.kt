@@ -19,7 +19,13 @@ data class Property(
     @SerializedName("mailing_address") val mailingAddress: String? = null,
     @SerializedName("last_sale_date") val lastSaleDate: String? = null,
     @SerializedName("is_out_of_state") val isOutOfState: Boolean = false,
-    @SerializedName("deceased_count") val deceasedCount: Int? = null
+    @SerializedName("deceased_count") val deceasedCount: Int? = null,
+    @SerializedName("delinquent") val isDelinquent: Boolean = false,
+    @SerializedName("situs_zip") val zipCode: String? = null,
+    @SerializedName("tax_year") val taxYear: String? = null,
+    @SerializedName("last_payment") val lastPayment: String? = null,
+    @SerializedName("owner_name") val ownerName: String? = null,
+    @SerializedName("research_status") val researchStatus: String? = null
 )
 
 data class PropertiesResponse(

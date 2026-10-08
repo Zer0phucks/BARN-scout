@@ -1,9 +1,15 @@
 package com.vpt.scout.ui.screens
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.material.icons.filled.Directions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -49,9 +56,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -66,27 +70,55 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.vpt.scout.ListRepository
 import com.vpt.scout.PropertiesResponse
 import com.vpt.scout.Property
 import com.vpt.scout.PropertyList
 import com.vpt.scout.PropertyRepository
 import com.vpt.scout.proximity.ProximityAlertPreferences
+import com.vpt.scout.ui.components.PropertyBadges
+import com.vpt.scout.ui.components.PropertyDetailSheet
+import com.vpt.scout.ui.components.PropertyPhoto
+import com.vpt.scout.ui.openDirections
 import kotlinx.coroutines.launch
 
-private enum class ExploreMode { LIST, GALLERY }
+enum class ExploreMode { LIST, GALLERY }
+
+/**
+ * Filter state shared by the List and Gallery tabs, so switching tabs keeps the
+ * current search. Owned by ScoutApp for the lifetime of the signed-in session.
+ */
+class ExploreFilters {
+    var selectedCity by mutableStateOf<String?>(null)
+    var searchQuery by mutableStateOf("")
+    var zipFilter by mutableStateOf("")
+    var powerFilter by mutableStateOf("")
+    var favoritesOnly by mutableStateOf(false)
+    var vptOnly by mutableStateOf(false)
+    var delinquentOnly by mutableStateOf(false)
+    var conditionFilter by mutableStateOf("")
+    var outOfStateOnly by mutableStateOf(false)
+    var researchFilter by mutableStateOf("")
+    var ownerName by mutableStateOf("")
+    var sortBy by mutableStateOf("location_of_property")
+    var sortOrder by mutableStateOf("asc")
+    var showUnscoutedOnly by mutableStateOf(false)
+    var selectedListId by mutableStateOf<Long?>(null)
+
+    /** Scout buttons and proximity alerts; collapsed so results get the screen. */
+    var toolsExpanded by mutableStateOf(false)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PropertiesScreen(
+    mode: ExploreMode,
+    filters: ExploreFilters,
     propertyRepository: PropertyRepository,
     listRepository: ListRepository,
     proximityAlertPreferences: ProximityAlertPreferences,
@@ -100,22 +132,22 @@ fun PropertiesScreen(
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    var exploreMode by remember { mutableStateOf(ExploreMode.LIST) }
-    var selectedCity by remember { mutableStateOf<String?>(null) }
-    var searchQuery by remember { mutableStateOf("") }
-    var zipFilter by remember { mutableStateOf("") }
-    var powerFilter by remember { mutableStateOf("") }
-    var favoritesOnly by remember { mutableStateOf(false) }
-    var vptOnly by remember { mutableStateOf(false) }
-    var delinquentOnly by remember { mutableStateOf(false) }
-    var conditionFilter by remember { mutableStateOf("") }
-    var outOfStateOnly by remember { mutableStateOf(false) }
-    var researchFilter by remember { mutableStateOf("") }
-    var ownerName by remember { mutableStateOf("") }
-    var sortBy by remember { mutableStateOf("location_of_property") }
-    var sortOrder by remember { mutableStateOf("asc") }
-    var showUnscoutedOnly by remember { mutableStateOf(false) }
-    var selectedListId by remember { mutableStateOf<Long?>(null) }
+    var selectedCity by filters::selectedCity
+    var searchQuery by filters::searchQuery
+    var zipFilter by filters::zipFilter
+    var powerFilter by filters::powerFilter
+    var favoritesOnly by filters::favoritesOnly
+    var vptOnly by filters::vptOnly
+    var delinquentOnly by filters::delinquentOnly
+    var conditionFilter by filters::conditionFilter
+    var outOfStateOnly by filters::outOfStateOnly
+    var researchFilter by filters::researchFilter
+    var ownerName by filters::ownerName
+    var sortBy by filters::sortBy
+    var sortOrder by filters::sortOrder
+    var showUnscoutedOnly by filters::showUnscoutedOnly
+    var selectedListId by filters::selectedListId
+    var detailProperty by remember { mutableStateOf<Property?>(null) }
     var currentPage by remember { mutableStateOf(1) }
 
     var selectedApns by remember { mutableStateOf(setOf<String>()) }
@@ -196,24 +228,8 @@ fun PropertiesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Explore") },
+                title = { Text(if (mode == ExploreMode.GALLERY) "Gallery" else "Properties") },
                 actions = {
-                    SingleChoiceSegmentedButtonRow {
-                        SegmentedButton(
-                            selected = exploreMode == ExploreMode.LIST,
-                            onClick = { exploreMode = ExploreMode.LIST },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                        ) {
-                            Text("List")
-                        }
-                        SegmentedButton(
-                            selected = exploreMode == ExploreMode.GALLERY,
-                            onClick = { exploreMode = ExploreMode.GALLERY },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                        ) {
-                            Text("Gallery")
-                        }
-                    }
                     IconButton(onClick = { loadProperties(currentPage) }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
@@ -235,12 +251,6 @@ fun PropertiesScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            ProximityAlertsSection(
-                proximityAlertPreferences = proximityAlertPreferences,
-                requestProximityPermissions = requestProximityPermissions,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-
             FilterBar(
                 searchQuery = searchQuery,
                 onSearchChange = { searchQuery = it },
@@ -278,16 +288,27 @@ fun PropertiesScreen(
                 onExpandToggle = { showFiltersExpanded = !showFiltersExpanded }
             )
 
-            ScoutActionButtons(
-                selectedListId = selectedListId,
-                favoritesOnly = favoritesOnly,
-                onScout = { onNavigateToScout(selectedCity, vptOnly, null) },
-                onScoutByList = {
-                    selectedListId?.let { listId ->
-                        onNavigateToScout(selectedCity, vptOnly, listId)
+            CollapsibleSection(
+                title = "Scout & alerts",
+                expanded = filters.toolsExpanded,
+                onToggle = { filters.toolsExpanded = !filters.toolsExpanded }
+            ) {
+                ProximityAlertsSection(
+                    proximityAlertPreferences = proximityAlertPreferences,
+                    requestProximityPermissions = requestProximityPermissions,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                ScoutActionButtons(
+                    selectedListId = selectedListId,
+                    favoritesOnly = favoritesOnly,
+                    onScout = { onNavigateToScout(selectedCity, vptOnly, null) },
+                    onScoutByList = {
+                        selectedListId?.let { listId ->
+                            onNavigateToScout(selectedCity, vptOnly, listId)
+                        }
                     }
-                }
-            )
+                )
+            }
 
             propertiesResponse?.let { response ->
                 Row(
@@ -362,36 +383,37 @@ fun PropertiesScreen(
 
                 else -> {
                     propertiesResponse?.let { response ->
-                        LazyColumn(modifier = Modifier.weight(1f)) {
-                            items(response.properties, key = { it.apn }) { property ->
-                                val onToggle: (Boolean) -> Unit = { selected ->
-                                    selectedApns = if (selected) selectedApns + property.apn else selectedApns - property.apn
-                                    if (!selected) selectAll = false
-                                }
-                                val onNavigate: () -> Unit = {
-                                    property.latitude?.let { lat ->
-                                        property.longitude?.let { lng ->
-                                            val uri = Uri.parse("google.navigation:q=$lat,$lng")
-                                            val intent = Intent(Intent.ACTION_VIEW, uri)
-                                            intent.setPackage("com.google.android.apps.maps")
-                                            context.startActivity(intent)
-                                        }
-                                    }
-                                }
+                        val onToggle: (Property, Boolean) -> Unit = { property, selected ->
+                            selectedApns = if (selected) selectedApns + property.apn else selectedApns - property.apn
+                            if (!selected) selectAll = false
+                        }
 
-                                if (exploreMode == ExploreMode.LIST) {
+                        if (mode == ExploreMode.LIST) {
+                            LazyColumn(modifier = Modifier.weight(1f)) {
+                                items(response.properties, key = { it.apn }) { property ->
                                     PropertyRow(
                                         property = property,
                                         isSelected = selectedApns.contains(property.apn),
-                                        onToggleSelect = onToggle,
-                                        onNavigate = onNavigate
+                                        onOpen = { detailProperty = property },
+                                        onToggleSelect = { onToggle(property, it) },
+                                        onNavigate = { openDirections(context, property) }
                                     )
-                                } else {
+                                }
+                            }
+                        } else {
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = 160.dp),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                gridItems(response.properties, key = { it.apn }) { property ->
                                     GalleryPropertyCard(
                                         property = property,
                                         isSelected = selectedApns.contains(property.apn),
-                                        onToggleSelect = onToggle,
-                                        onNavigate = onNavigate
+                                        onOpen = { detailProperty = property },
+                                        onToggleSelect = { onToggle(property, it) }
                                     )
                                 }
                             }
@@ -408,6 +430,19 @@ fun PropertiesScreen(
                 }
             }
         }
+    }
+
+    detailProperty?.let { property ->
+        PropertyDetailSheet(
+            property = property,
+            onDismiss = { detailProperty = null },
+            onAddToList = {
+                selectedApns = setOf(property.apn)
+                selectAll = false
+                detailProperty = null
+                showAddToListDialog = true
+            }
+        )
     }
 
     if (showAddToListDialog) {
@@ -439,6 +474,40 @@ fun PropertiesScreen(
                 showAddToListDialog = false
             }
         )
+    }
+}
+
+@Composable
+private fun CollapsibleSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().animateContentSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    onClickLabel = if (expanded) "Collapse $title" else "Expand $title",
+                    onClick = onToggle
+                )
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null
+            )
+        }
+        if (expanded) {
+            content()
+        }
     }
 }
 
@@ -732,10 +801,12 @@ private fun SimpleDropdownField(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PropertyRow(
     property: Property,
     isSelected: Boolean,
+    onOpen: () -> Unit,
     onToggleSelect: (Boolean) -> Unit,
     onNavigate: () -> Unit
 ) {
@@ -743,7 +814,12 @@ private fun PropertyRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable { onToggleSelect(!isSelected) },
+            .combinedClickable(
+                onClick = onOpen,
+                onLongClick = { onToggleSelect(!isSelected) },
+                onClickLabel = "Show details and directions",
+                onLongClickLabel = "Select"
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
@@ -776,115 +852,69 @@ private fun PropertyRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    RouteBadges(property)
+                    PropertyBadges(property)
                 }
             }
             IconButton(onClick = onNavigate) {
-                Icon(Icons.Default.Navigation, contentDescription = "Navigate")
+                Icon(Icons.Default.Directions, contentDescription = "Directions")
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GalleryPropertyCard(
     property: Property,
     isSelected: Boolean,
-    onToggleSelect: (Boolean) -> Unit,
-    onNavigate: () -> Unit
+    onOpen: () -> Unit,
+    onToggleSelect: (Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clickable { onToggleSelect(!isSelected) },
+            .combinedClickable(
+                onClick = onOpen,
+                onLongClick = { onToggleSelect(!isSelected) },
+                onClickLabel = "Show details and directions",
+                onLongClickLabel = "Select"
+            ),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surface
         )
     ) {
-        Column {
-            if (!property.streetviewImagePath.isNullOrBlank()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(property.streetviewImagePath)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = property.address,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            Row(
+        Box {
+            PropertyPhoto(
+                property = property,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(checked = isSelected, onCheckedChange = onToggleSelect)
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        property.address ?: property.apn,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        listOfNotNull(property.city, property.apn).joinToString(" • "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    RouteBadges(property)
-                }
-                IconButton(onClick = onNavigate) {
-                    Icon(Icons.Default.Navigation, contentDescription = "Navigate")
-                }
+                    .aspectRatio(4f / 3f)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+            )
+            if (isSelected) {
+                Checkbox(
+                    checked = true,
+                    onCheckedChange = onToggleSelect,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                )
             }
         }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun RouteBadges(property: Property) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        if (property.hasVpt) {
-            Badge(containerColor = Color(0xFFE53935)) {
-                Text("VPT", fontSize = 10.sp)
-            }
-        }
-        property.powerStatus?.takeIf { it.isNotBlank() }?.let { power ->
-            Badge(containerColor = if (power.equals("off", ignoreCase = true)) Color(0xFFE67E22) else Color(0xFF2E7D32)) {
-                Text(power.uppercase(), fontSize = 10.sp)
-            }
-        }
-        property.conditionScore?.let { score ->
-            val color = when {
-                score >= 7f -> Color(0xFFE53935)
-                score >= 4f -> Color(0xFFFFC107)
-                else -> Color(0xFF4CAF50)
-            }
-            Badge(containerColor = color) {
-                Text("${"%.0f".format(score)}/10", fontSize = 10.sp)
-            }
-        }
-        if (property.isOutOfState) {
-            Badge(containerColor = Color(0xFF7B1FA2)) {
-                Text("OOS", fontSize = 10.sp)
-            }
-        }
-        if (property.isScouted) {
-            Badge(containerColor = Color(0xFF546E7A)) {
-                Text("Scouted", fontSize = 10.sp)
-            }
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text(
+                property.address ?: property.apn,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                property.city.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            PropertyBadges(property)
         }
     }
 }

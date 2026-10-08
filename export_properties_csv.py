@@ -4,7 +4,7 @@ Export all property addresses from Supabase to a Google My Maps-compatible CSV.
 
 This script connects directly to the Supabase Postgres database.
 It requires the database password, which you can get from:
-  https://supabase.com/dashboard/project/vzgmmlaojvkpbakvgcwh/settings/database
+  https://supabase.com/dashboard/project/zezhsmgtdzlagqwlvjui/settings/database
 
 Usage:
     export SUPABASE_DB_PASSWORD="your-password-here"
@@ -29,7 +29,7 @@ import os
 import sys
 
 # ── Config ───────────────────────────────────────────────────────────────────
-DB_HOST     = "db.vzgmmlaojvkpbakvgcwh.supabase.co"
+DB_HOST     = "db.zezhsmgtdzlagqwlvjui.supabase.co"
 DB_PORT     = 5432
 DB_NAME     = "postgres"
 DB_USER     = "postgres"
@@ -58,7 +58,7 @@ def main():
         print("ERROR: SUPABASE_DB_PASSWORD environment variable not set.")
         print()
         print("Get your database password from:")
-        print("  https://supabase.com/dashboard/project/vzgmmlaojvkpbakvgcwh/settings/database")
+        print("  https://supabase.com/dashboard/project/zezhsmgtdzlagqwlvjui/settings/database")
         print()
         print("Then run:")
         print("  export SUPABASE_DB_PASSWORD='your-password'")

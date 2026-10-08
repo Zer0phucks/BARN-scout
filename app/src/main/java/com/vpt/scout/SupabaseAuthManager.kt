@@ -33,8 +33,8 @@ class SupabaseAuthManager(
     constructor(context: Context) : this(
         prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
         httpClient = OkHttpClient(),
-        supabaseUrl = context.applicationContext.getString(R.string.supabase_url).trimEnd('/'),
-        supabaseAnonKey = context.applicationContext.getString(R.string.supabase_anon_key)
+        supabaseUrl = BuildConfig.SUPABASE_URL.trimEnd('/'),
+        supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY
     )
 
     private val _state = MutableStateFlow(loadState())
