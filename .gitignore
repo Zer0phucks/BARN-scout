@@ -12,3 +12,8 @@ app/.idea/
 local.properties
 .kotlin/
 captures/
+
+# Release signing (keystore lives outside the repo; see README)
+keystore.properties
+*.jks
+*.keystore
