@@ -330,6 +330,202 @@ class SupabaseAuthManagerTest {
         assertNull(prefs.getString("refresh_token", null))
     }
 
+    @Test
+    fun `signIn reports unapproved accounts with a typed error`() = runBlocking {
+        server.enqueue(tokenResponse())
+        server.enqueue(approved(false))
+
+        val result = manager().signIn("agent@example.com", "secret")
+
+        assertTrue(result.exceptionOrNull() is NotApprovedException)
+    }
+
+    @Test
+    fun `signUp posts credentials and name metadata`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"user-1","email":"new@example.com"}"""))
+
+        manager().signUp("  new@example.com ", "longpassword", " Pat Scout ")
+
+        val request = server.takeRequest()
+        assertEquals("/auth/v1/signup", request.path)
+        assertEquals("anon-key", request.getHeader("apikey"))
+        assertEquals(
+            """{"email":"new@example.com","password":"longpassword","data":{"full_name":"Pat Scout"}}""",
+            request.body.readUtf8()
+        )
+    }
+
+    @Test
+    fun `signUp without a session asks the user to confirm their email`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"id":"user-1","email":"new@example.com"}"""))
+        val authManager = manager()
+
+        val result = authManager.signUp("new@example.com", "longpassword")
+
+        assertEquals(SignUpOutcome.ConfirmEmail("new@example.com"), result.getOrNull())
+        assertFalse(authManager.state.value.isAuthenticated)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `signUp with a session but no role is pending and not stored`() = runBlocking {
+        server.enqueue(tokenResponse())
+        server.enqueue(approved(false))
+        val authManager = manager()
+
+        val result = authManager.signUp("agent@example.com", "longpassword")
+
+        assertEquals(SignUpOutcome.PendingApproval("agent@example.com"), result.getOrNull())
+        assertFalse(authManager.state.value.isAuthenticated)
+        assertNull(prefs.getString("access_token", null))
+    }
+
+    @Test
+    fun `signUp of a pre-approved account signs in`() = runBlocking {
+        server.enqueue(tokenResponse())
+        server.enqueue(approved(true))
+        val authManager = manager()
+
+        val result = authManager.signUp("agent@example.com", "longpassword")
+
+        assertTrue(result.getOrNull() is SignUpOutcome.SignedIn)
+        assertTrue(authManager.state.value.isAuthenticated)
+        assertEquals("access-123", prefs.getString("access_token", null))
+    }
+
+    @Test
+    fun `signUp explains when sign-ups are disabled`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(422)
+                .setBody("""{"code":422,"error_code":"signup_disabled","msg":"Signups not allowed for this instance"}""")
+        )
+
+        val result = manager().signUp("new@example.com", "longpassword")
+
+        assertEquals(
+            "New sign-ups are turned off. Ask an admin for an invite.",
+            result.exceptionOrNull()?.message
+        )
+    }
+
+    @Test
+    fun `signUp explains when the email is taken`() = runBlocking {
+        server.enqueue(
+            MockResponse().setResponseCode(422)
+                .setBody("""{"code":422,"error_code":"user_already_exists","msg":"User already registered"}""")
+        )
+
+        val result = manager().signUp("agent@example.com", "longpassword")
+
+        assertEquals("That email already has an account. Sign in instead.", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `resendConfirmation posts a signup resend`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+
+        val result = manager().resendConfirmation(" new@example.com ")
+
+        assertTrue(result.isSuccess)
+        val request = server.takeRequest()
+        assertEquals("/auth/v1/resend", request.path)
+        assertEquals("""{"type":"signup","email":"new@example.com"}""", request.body.readUtf8())
+    }
+
+    @Test
+    fun `unsubscribed sign-in keeps the session in memory only`() = runBlocking {
+        server.enqueue(tokenResponse())
+        server.enqueue(approved(false))
+        val authManager = manager()
+
+        authManager.signIn("agent@example.com", "secret")
+
+        assertEquals("access-123", authManager.pendingSession.value?.accessToken)
+        assertFalse(authManager.state.value.isAuthenticated)
+        assertNull(prefs.getString("access_token", null))
+    }
+
+    @Test
+    fun `recheckPendingAccess signs in once the subscription is live`() = runBlocking {
+        server.enqueue(tokenResponse())
+        server.enqueue(approved(false))
+        val authManager = manager()
+        authManager.signIn("agent@example.com", "secret")
+
+        server.enqueue(approved(false))
+        assertEquals(AccessCheck.NOT_APPROVED, authManager.recheckPendingAccess())
+        assertFalse(authManager.state.value.isAuthenticated)
+
+        server.enqueue(approved(true))
+        assertEquals(AccessCheck.APPROVED, authManager.recheckPendingAccess())
+        assertTrue(authManager.state.value.isAuthenticated)
+        assertNull(authManager.pendingSession.value)
+        assertEquals("access-123", prefs.getString("access_token", null))
+    }
+
+    @Test
+    fun `verifyAccess moves a lapsed subscriber to the paywall`() = runBlocking {
+        prefs.edit().putString("access_token", "stored").putString("refresh_token", "r").apply()
+        val authManager = manager()
+        server.enqueue(approved(false))
+
+        authManager.verifyAccess()
+
+        assertFalse(authManager.state.value.isAuthenticated)
+        assertEquals("stored", authManager.pendingSession.value?.accessToken)
+        assertNull(prefs.getString("access_token", null))
+    }
+
+    @Test
+    fun `startSubscriptionCheckout calls the edge function with the pending token`() = runBlocking {
+        server.enqueue(tokenResponse())
+        server.enqueue(approved(false))
+        val authManager = manager()
+        authManager.signIn("agent@example.com", "secret")
+        server.takeRequest(); server.takeRequest()
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"url":"https://checkout.stripe.com/c/pay/cs_test_1"}"""))
+
+        val result = authManager.startSubscriptionCheckout()
+
+        assertEquals(CheckoutStart.Redirect("https://checkout.stripe.com/c/pay/cs_test_1"), result.getOrNull())
+        val request = server.takeRequest()
+        assertEquals("/functions/v1/create-subscription-checkout", request.path)
+        assertEquals("Bearer access-123", request.getHeader("Authorization"))
+        assertEquals("""{"return_path":"/billing/done"}""", request.body.readUtf8())
+    }
+
+    @Test
+    fun `startSubscriptionCheckout reports an existing subscription`() = runBlocking {
+        prefs.edit().putString("access_token", "stored").apply()
+        server.enqueue(MockResponse().setResponseCode(200).setBody("""{"already_subscribed":true}"""))
+
+        assertEquals(CheckoutStart.AlreadySubscribed, manager().startSubscriptionCheckout().getOrNull())
+    }
+
+    @Test
+    fun `billing calls fail clearly without a session or when it expired`() = runBlocking {
+        assertEquals("Sign in first.", manager().billingPortalUrl().exceptionOrNull()?.message)
+
+        prefs.edit().putString("access_token", "stored").apply()
+        server.enqueue(MockResponse().setResponseCode(401).setBody("""{"error":"Sign in first."}"""))
+        assertEquals("Your session expired. Sign in again.", manager().billingPortalUrl().exceptionOrNull()?.message)
+
+        server.enqueue(MockResponse().setResponseCode(404).setBody("""{"error":"No subscription found for this account."}"""))
+        assertEquals("No subscription found for this account.", manager().billingPortalUrl().exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `signOut also forgets a pending session`() = runBlocking {
+        server.enqueue(tokenResponse())
+        server.enqueue(approved(false))
+        val authManager = manager()
+        authManager.signIn("agent@example.com", "secret")
+
+        authManager.signOut()
+
+        assertNull(authManager.pendingSession.value)
+    }
+
     private fun manager(resetUrl: String = "") = SupabaseAuthManager(
         prefs = prefs,
         httpClient = OkHttpClient(),

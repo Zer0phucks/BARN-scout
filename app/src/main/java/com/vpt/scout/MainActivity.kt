@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +15,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -115,10 +118,11 @@ fun ScoutApp(
 ) {
     val authState by container.authManager.state.collectAsState()
     val loginScope = rememberCoroutineScope()
+    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
     var loginError by remember { mutableStateOf<String?>(null) }
-    var loginLoading by remember { mutableStateOf(false) }
-    var loginInfo by remember { mutableStateOf<String?>(null) }
     var lastEmail by remember { mutableStateOf(authState.email ?: "") }
+    LaunchedEffect(authState.email) { authState.email?.let { lastEmail = it } }
 
     // A stored session may belong to someone whose access was revoked since last launch.
     LaunchedEffect(authState.userId) {
@@ -130,43 +134,10 @@ fun ScoutApp(
     }
 
     if (!authState.isAuthenticated) {
-        LoginScreen(
+        AuthFlow(
+            authManager = container.authManager,
             initialEmail = lastEmail,
-            isLoading = loginLoading,
-            errorMessage = loginError,
-            infoMessage = loginInfo,
-            onLogin = { email, password ->
-                lastEmail = email
-                loginScope.launch {
-                    loginLoading = true
-                    loginError = null
-                    loginInfo = null
-                    val result = container.authManager.signIn(email, password)
-                    if (result.isFailure) {
-                        loginError = result.exceptionOrNull()?.message ?: "Login failed."
-                    }
-                    loginLoading = false
-                }
-            },
-            onForgotPassword = { email ->
-                lastEmail = email
-                loginError = null
-                loginInfo = null
-                if (email.isBlank()) {
-                    loginError = "Enter your email first, then tap \"Forgot password?\"."
-                } else {
-                    loginScope.launch {
-                        loginLoading = true
-                        val result = container.authManager.requestPasswordReset(email)
-                        if (result.isSuccess) {
-                            loginInfo = "If that email has an account, a reset link is on its way."
-                        } else {
-                            loginError = result.exceptionOrNull()?.message ?: "Could not send reset email."
-                        }
-                        loginLoading = false
-                    }
-                }
-            }
+            notice = loginError
         )
         return
     }
@@ -259,8 +230,16 @@ fun ScoutApp(
                     signedInEmail = authState.email,
                     onSignOut = {
                         loginError = null
-                        loginInfo = null
                         loginScope.launch { container.authManager.logout() }
+                    },
+                    onManageSubscription = {
+                        loginScope.launch {
+                            container.authManager.billingPortalUrl()
+                                .onSuccess { url -> runCatching { uriHandler.openUri(url) } }
+                                .onFailure { e ->
+                                    Toast.makeText(context, e.message ?: "Could not open billing.", Toast.LENGTH_LONG).show()
+                                }
+                        }
                     }
                 )
             }

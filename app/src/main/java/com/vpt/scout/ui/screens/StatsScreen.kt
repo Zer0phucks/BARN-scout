@@ -45,7 +45,8 @@ internal fun statsLoadErrorMessage(throwable: Throwable): String {
 fun StatsScreen(
     scoutRepository: ScoutRepository,
     signedInEmail: String? = null,
-    onSignOut: () -> Unit = {}
+    onSignOut: () -> Unit = {},
+    onManageSubscription: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     var stats by remember { mutableStateOf<ScoutStats?>(null) }
@@ -81,6 +82,9 @@ fun StatsScreen(
                         }
                     }) {
                         Icon(Icons.Default.Refresh, "Refresh")
+                    }
+                    IconButton(onClick = onManageSubscription) {
+                        Icon(Icons.Default.CreditCard, contentDescription = "Manage subscription")
                     }
                     IconButton(onClick = onSignOut) {
                         Icon(
