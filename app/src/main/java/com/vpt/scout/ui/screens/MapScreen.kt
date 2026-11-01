@@ -54,6 +54,20 @@ fun MapScreen(
     var activeRoute by remember { mutableStateOf<com.vpt.scout.ListWithProperties?>(null) }
     
     var selectedProperty by remember { mutableStateOf<PropertyEntity?>(null) }
+    var selectedPropertyDetails by remember { mutableStateOf<Property?>(null) }
+    // Map entities cache only marker fields; load the ZIP and other details on tap.
+    LaunchedEffect(selectedProperty?.apn) {
+        selectedPropertyDetails = null
+        selectedProperty?.apn?.let { apn ->
+            try {
+                selectedPropertyDetails = propertyRepository.getPropertyByApn(apn)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Cached details and directions remain usable when offline.
+            }
+        }
+    }
     var showListDialog by remember { mutableStateOf(false) }
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
     val lastFetchedBounds = remember { mutableStateOf<LatLngBounds?>(null) }
@@ -343,7 +357,7 @@ fun MapScreen(
                     if (rank in 1..5) "$base · #$rank closest" else base
                 }
                 PropertyDetailSheet(
-                    property = entity.toProperty(),
+                    property = selectedPropertyDetails?.takeIf { it.apn == entity.apn } ?: entity.toProperty(),
                     distanceText = distanceText,
                     onDismiss = { selectedProperty = null },
                     onAddToList = { showListDialog = true }

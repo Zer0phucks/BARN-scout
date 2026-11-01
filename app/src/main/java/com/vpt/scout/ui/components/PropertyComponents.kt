@@ -1,6 +1,12 @@
 package com.vpt.scout.ui.components
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import com.vpt.scout.Property
 import com.vpt.scout.ui.openDirections
+import com.vpt.scout.ui.cyberBackgroundChecksUrl
 import com.vpt.scout.ui.propertyImageUrl
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -156,6 +163,7 @@ fun PropertyDetailSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp)
                 .navigationBarsPadding()
@@ -211,6 +219,30 @@ fun PropertyDetailSheet(
             DetailLine("Site vacant", property.siteVacant?.let { if (it) "Yes" else "No" })
 
             Spacer(modifier = Modifier.height(16.dp))
+            val cyberUrl = cyberBackgroundChecksUrl(property.address, property.city, property.zipCode)
+            OutlinedButton(
+                onClick = {
+                    cyberUrl?.let { url ->
+                        try {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        } catch (_: ActivityNotFoundException) {
+                            Toast.makeText(context, "No browser available to open this link", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                enabled = cyberUrl != null,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Cyber Background Checks")
+            }
+            if (cyberUrl == null) {
+                Text(
+                    "Street address, city and ZIP code are needed for this search.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = { openDirections(context, property) },
                 enabled = property.latitude != null || !property.address.isNullOrBlank(),
